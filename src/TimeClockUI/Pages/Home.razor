@@ -1,0 +1,72 @@
+﻿@page "/"
+@using MudBlazor
+@using TimeClock.Client
+using System.Diagnostics;
+
+
+<PageTitle>Home</PageTitle>
+
+<h1>@DisplayNextPunchStatus</h1>
+
+<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
+<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut">Punch Out</MudButton>
+<MudText Typo="@Typo.h4">Hours Type:</MudText>
+<MudSelect @bind-Value="@punchType"> 
+    @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))
+    {
+        <MudSelectItem Value="@hourType">@GetPunchTypeDisplayString(hourType)</MudSelectItem>
+    }
+</MudSelect>
+
+<MudText Typo="Typo.h1">Hours Worked Today:</MudText>
+
+<MudText Typo="@Typo.h3">Tech lead Hours</MudText>
+<MudText Typo="@Typo.body1">@techLeadHoursTotal</MudText>
+<MudText Typo="@Typo.h3">Regular Hours</MudText>
+<MudText Typo="@Typo.body1">@regularHoursTotal</MudText>
+
+
+@code {
+
+
+        [Inject] public TimePunchClient timePunchClient {get;set;} = null!;
+    
+        private string DisplayNextPunchStatus => punchIn ? "Please Punch in" : $"Pleas Punch out last Punch time: {lastPunch}";
+        private string PunchButtonText => punchIn ? "Punch in" : "Punch Out";
+        private bool punchIn;
+        private HourType punchType;
+        private string techLeadHoursTotal = "0:00";
+        private string regularHoursTotal = "0:00";
+
+        private string lastPunch = "";
+        protected override void OnInitialized()
+        {
+            //TODO: fetch actual data from backend
+            lastPunch = DateTime.Now.ToString("MM/dd/YYYY hh:mm");
+            //TODO: fetch Totals By Type
+        }
+
+        private string GetPunchTypeDisplayString(HourType type) => 
+            type switch {
+                HourType.Regular => "Regular Hours",
+                HourType.TechLead => "Tech Lead Hours",
+                _ => "Unknown type"
+            };
+
+        private async Task PunchIn(){
+            //TODO: Call Punch Endpoint 
+            // will punch out of other types if you punch in to a new type
+            await timePunchClient.Punch(punchType, PunchType.PunchIn);
+            
+        }
+        private async Task PunchOut(){
+            //TODO: Call Punch Endpoint 
+            // will punch out of all active Punches "Should Only be one punch type though"
+            await timePunchClient.Punch(punchType, PunchType.PunchOut);
+
+        }
+}
+
+
+using Microsoft.VisualBasic;
+#line default
