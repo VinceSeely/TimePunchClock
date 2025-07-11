@@ -12,8 +12,9 @@ public record PunchInfo
 
 public record PunchRecord
 {
+    public Guid PuchId { get; init; }
     public DateTime PunchIn { get; init; }
-    public DateTime PunchOut { get; init; }
+    public DateTime? PunchOut { get; init; }
     public HourType HourType { get; init; }
 }
 

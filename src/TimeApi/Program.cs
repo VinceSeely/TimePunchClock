@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using TimeApi.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -6,7 +9,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 //TODO add proper registration
-builder.Services.AddDbContext<TimeClockDbContext>( );
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<TimeClockDbContext>(options =>
+    options.UseSqlServer(connectionString));
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

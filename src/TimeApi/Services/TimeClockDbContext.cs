@@ -1,10 +1,9 @@
-using System;
 using Microsoft.EntityFrameworkCore;
-using TimeClock.Client;
+using TimeApi.Models;
 
 namespace TimeApi.Services;
 
-public class TimeClockDbContext : DbContext
+public class TimeClockDbContext (DbContextOptions<TimeClockDbContext> options): DbContext(options)
 {
     public DbSet<PunchEntity> Punchs { get; set; }
 
