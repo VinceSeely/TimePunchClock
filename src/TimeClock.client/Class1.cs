@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 
@@ -62,7 +63,7 @@ public class TimePunchClient(IHttpClientFactory clientFactory)
             var json = JsonConvert.SerializeObject(punchInfo);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            await client.PostAsync("your-endpoint-url", content);
+            await client.PostAsync(Constants.TimePunchApi, content);
         
     }
     public async Task<IEnumerable<PunchRecord>> GetPunchesRange(DateTime start, DateTime end, CancellationToken cancellationToken = default)
@@ -82,11 +83,14 @@ public static class TimepunchServiceExtensions
 {
     public static IServiceCollection RegsiterTimeClient(this IServiceCollection services, IConfiguration config)
     {
+            var baseUrl = config.GetValue<String>(Constants.TimeClientBaseUrl) ?? string.Empty;
+            Console.WriteLine("base url: " + baseUrl);
+        
         services.AddHttpClient(Constants.TimeClientString, client =>
         {
-            var baseUrl = config.GetValue<String>(Constants.TimeClientBaseUrl) ?? string.Empty;
             client.BaseAddress = new Uri(baseUrl);
         });
+        services.AddScoped<TimePunchClient>();
         return services;
     }
 }

@@ -8,6 +8,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
+
+// Add CORS configuration to allow any origin
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+             .AllowAnyMethod()
+             .AllowAnyHeader();
+    });
+});
+builder.Services.AddScoped<TimePunchRepository>();
+
 //TODO add proper registration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -22,6 +35,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseCors("AllowAll");
+
 app.UseHttpsRedirection();
+
+// Map controller endpoints
+app.MapControllers();
+
+// Ensure database is created on startup
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<TimeClockDbContext>();
+    dbContext.Database.EnsureCreated();
+}
 
 app.Run();

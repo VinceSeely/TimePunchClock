@@ -1,0 +1,66 @@
+﻿version: '3.8'
+
+services:
+  timeapi:
+    image: timeapi
+    build:
+      context: ./src
+      dockerfile: TimeApi/Dockerfile
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=mssql;Database=TimeClockDB;User Id=sa;Password=Your_Strong_Password123!;TrustServerCertificate=True;
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      # Mount appsettings to ensure they're included
+      - ./src/TimeApi/appsettings.json:/app/appsettings.json:ro
+      - ./src/TimeApi/appsettings.Development.json:/app/appsettings.Development.json:ro
+    depends_on:
+      - mssql
+    networks:
+      - timeclock-network
+
+  timeclockui:
+    image: timeclockui
+    build:
+      context: ./src
+      dockerfile: TimeClockUI/Dockerfile
+    ports:
+      - "5001:80"
+    environment:
+      # For Blazor WASM, we need to use the public-facing URL that the browser will use
+      - TimeClientBaseUrl=http://localhost:5000
+      - AuthUrl=http://localhost:5000/auth
+    depends_on:
+      - timeapi
+    networks:
+      - timeclock-network
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: timeclock-mssql
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Your_Strong_Password123!
+      - MSSQL_PID=Express
+    ports:
+      - "1439:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - timeclock-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      retries: 10
+      start_period: 10s
+      timeout: 3s
+
+networks:
+  timeclock-network:
+    driver: bridge
+
+volumes:
+  mssql-data:

@@ -14,13 +14,13 @@ namespace TimeApi.Api
     {
 
 
-        [HttpGet("hours")]
+        [HttpGet]
         public ActionResult GetHours(DateTime start, DateTime end)
         {
             var results = punchRepository.GetPunchRecords(start, end);
-            if (!results.IsNullOrEmpty())
+            if (results.IsNullOrEmpty())
             {
-                return BadRequest("No results found for date range");
+                return Ok(Array.Empty<PunchRecord>());
             }
             return Ok(results);
         }
