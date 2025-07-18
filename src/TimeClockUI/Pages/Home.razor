@@ -27,6 +27,8 @@
     <MudText Typo="@Typo.body1">@techLeadHoursTotal</MudText>
     <MudText Typo="@Typo.h3">Regular Hours</MudText>
     <MudText Typo="@Typo.body1">@regularHoursTotal</MudText>
+    <MudText Typo="@Typo.h3">Total Hours</MudText>
+    <MudText Typo="@Typo.body1">@combinedHoursTotal</MudText>
 }
 
 
@@ -44,12 +46,14 @@
         private PunchRecord lastPunch = null!;
         private string techLeadHoursTotal = "0:00";
         private string regularHoursTotal = "0:00";
+        private string combinedHoursTotal = "00:00";
         private IEnumerable<PunchRecord> todaysPunchs= null!;
 
         protected override async Task OnInitializedAsync()
         {
             lastPunch = await timePunchClient.GetLastPunch();
             todaysPunchs = await timePunchClient.GetTodaysPunchs();
+            CalculateAndSetHours();
         }
 
         private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToLocalTime().ToString("MM:dd hh:mm tt");
@@ -64,16 +68,17 @@
         private async Task PunchIn(){
             lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchIn);
             todaysPunchs = await timePunchClient.GetTodaysPunchs();
-            CalculateHours();
+            CalculateAndSetHours();
             StateHasChanged();
         }
         private async Task PunchOut(){
             lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchOut);
             todaysPunchs = await timePunchClient.GetTodaysPunchs();
+            CalculateAndSetHours();
             StateHasChanged();
         }
 
-        private void CalculateHours()
+        private void CalculateAndSetHours()
         {
             var groupedHours = Enum.GetValues(typeof(HourType))
                 .Cast<HourType>()
@@ -89,10 +94,19 @@
                         int hours = (int)(totalMinutes / 60);
                         int minutes = (int)(totalMinutes % 60);
 
-                        return $"{hours:D2}:{minutes:D2}";
+                        return (hours, minutes);
                     });
 
-            techLeadHoursTotal = groupedHours.GetValueOrDefault(HourType.TechLead, "00:00");
-            regularHoursTotal = groupedHours.GetValueOrDefault(HourType.Regular, "00:00");
-        }
+            var (techHours, techMins) = groupedHours.GetValueOrDefault(HourType.TechLead, (0, 0));
+            var (regHours, regMins) = groupedHours.GetValueOrDefault(HourType.Regular, (0, 0));
+
+            techLeadHoursTotal = $"{techHours:D2}:{techMins:D2}";
+            regularHoursTotal  = $"{regHours:D2}:{regMins:D2}";
+
+            int combinedMinutes = techHours * 60 + techMins + regHours * 60 + regMins;
+            int totalHours = combinedMinutes / 60;
+            int totalMins = combinedMinutes % 60;
+
+            combinedHoursTotal = $"{totalHours:D2}:{totalMins:D2}";
+        } 
 }
