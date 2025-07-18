@@ -9,7 +9,7 @@ using System.Diagnostics;
 <h1>@DisplayNextPunchStatus</h1>
 
 <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
-<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut">Punch Out</MudButton>
+<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@punchIn">Punch Out</MudButton>
 <MudText Typo="@Typo.h4">Hours Type:</MudText>
 <MudSelect @bind-Value="@punchType"> 
     @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))
@@ -31,20 +31,21 @@ using System.Diagnostics;
 
         [Inject] public TimePunchClient timePunchClient {get;set;} = null!;
     
-        private string DisplayNextPunchStatus => punchIn ? "Please Punch in" : $"Pleas Punch out last Punch time: {lastPunch}";
+        private string DisplayNextPunchStatus => $"Please Punch {(punchIn ? "in" : "out")} last Punch time: {lastPunch}";
+
         private string PunchButtonText => punchIn ? "Punch in" : "Punch Out";
-        private bool punchIn;
+        private bool punchIn => lastPunch.PunchOut != null;
         private HourType punchType;
+        private PunchRecord lastPunch = null!;
         private string techLeadHoursTotal = "0:00";
         private string regularHoursTotal = "0:00";
 
-        private string lastPunch = "";
-        protected override void OnInitialized()
+        protected override async Task OnInitializedAsync()
         {
-            //TODO: fetch actual data from backend
-            lastPunch = DateTime.Now.ToString("MM/dd/YYYY hh:mm");
-            //TODO: fetch Totals By Type
+            lastPunch = await timePunchClient.GetLastPunch();
         }
+
+        private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToString("MM:dd hh:mm tt");
 
         private string GetPunchTypeDisplayString(HourType type) => 
             type switch {
@@ -54,16 +55,12 @@ using System.Diagnostics;
             };
 
         private async Task PunchIn(){
-            //TODO: Call Punch Endpoint 
-            // will punch out of other types if you punch in to a new type
-            await timePunchClient.Punch(punchType, PunchType.PunchIn);
-            
+            lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchIn);
+            StateHasChanged();
         }
         private async Task PunchOut(){
-            //TODO: Call Punch Endpoint 
-            // will punch out of all active Punches "Should Only be one punch type though"
-            await timePunchClient.Punch(punchType, PunchType.PunchOut);
-
+            lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchOut);
+            StateHasChanged();
         }
 }
 

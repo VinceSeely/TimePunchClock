@@ -29,9 +29,18 @@ namespace TimeApi.Api
         public ActionResult PunchHours(PunchInfo punchInfo)
         {
             punchRepository.InsertPunch(punchInfo);
+            var lastPunch = punchRepository.GetLastPunch();
 
-            return Ok();
+            return Ok(lastPunch);
 
+        }
+
+        [HttpGet("lastpunch")]
+        public ActionResult GetLastPunch()
+        {
+            var lastPunch = punchRepository.GetLastPunch();
+
+            return Ok(lastPunch);
         }
     }
 

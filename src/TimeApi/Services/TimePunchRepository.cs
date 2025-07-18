@@ -11,6 +11,7 @@ public class TimePunchRepository(TimeClockDbContext context)
 
     public void InsertPunch(PunchInfo punch)
     {
+        PunchEntity newPunch;
         var latestPunch = context.Punchs
             .OrderByDescending(p => p.PunchIn)
             .FirstOrDefault();
@@ -24,7 +25,7 @@ public class TimePunchRepository(TimeClockDbContext context)
             {
                 latestPunch.PunchOut = DateTime.Now;
             }
-            var newPunch = new PunchEntity
+            newPunch = new PunchEntity
             {
                 PunchIn = DateTime.Now,
                 HourType = punch.HourType
@@ -46,4 +47,15 @@ public class TimePunchRepository(TimeClockDbContext context)
         return query;
     }
 
+    public PunchRecord GetLastPunch()
+    {
+        var mostRecentPunch = context.Punchs.OrderByDescending(punch => punch.PunchIn).ThenByDescending(punch => punch.PunchOut).First();
+        return new PunchRecord
+        {
+            PunchIn = mostRecentPunch.PunchIn,
+            PunchOut = mostRecentPunch.PunchOut,
+            PuchId = mostRecentPunch.PunchId,
+            HourType = mostRecentPunch.HourType
+        };
+    }
 }
