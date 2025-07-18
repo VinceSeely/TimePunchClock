@@ -31,7 +31,7 @@ using System.Diagnostics;
 
         [Inject] public TimePunchClient timePunchClient {get;set;} = null!;
     
-        private string DisplayNextPunchStatus => $"Please Punch {(punchIn ? "in" : "out")} last Punch time: {lastPunch}";
+        private string DisplayNextPunchStatus => $"Please Punch {(punchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
 
         private string PunchButtonText => punchIn ? "Punch in" : "Punch Out";
         private bool punchIn => lastPunch.PunchOut != null;
@@ -45,7 +45,7 @@ using System.Diagnostics;
             lastPunch = await timePunchClient.GetLastPunch();
         }
 
-        private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToString("MM:dd hh:mm tt");
+        private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToLocalTime().ToString("MM:dd hh:mm tt");
 
         private string GetPunchTypeDisplayString(HourType type) => 
             type switch {
