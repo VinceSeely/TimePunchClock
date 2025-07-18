@@ -1,29 +1,33 @@
 ﻿@page "/"
 @using MudBlazor
 @using TimeClock.Client
-using System.Diagnostics;
 
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Punch Clock</PageTitle>
 
 <h1>@DisplayNextPunchStatus</h1>
 
 <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
 <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@punchIn">Punch Out</MudButton>
 <MudText Typo="@Typo.h4">Hours Type:</MudText>
-<MudSelect @bind-Value="@punchType"> 
+<MudSelect Label="Show Hours" @bind-Value="@punchType"> 
     @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))
     {
         <MudSelectItem Value="@hourType">@GetPunchTypeDisplayString(hourType)</MudSelectItem>
     }
 </MudSelect>
 
-<MudText Typo="Typo.h1">Hours Worked Today:</MudText>
+<MudSwitch  @bind-value="@ShowHours"></MudSwitch >
 
-<MudText Typo="@Typo.h3">Tech lead Hours</MudText>
-<MudText Typo="@Typo.body1">@techLeadHoursTotal</MudText>
-<MudText Typo="@Typo.h3">Regular Hours</MudText>
-<MudText Typo="@Typo.body1">@regularHoursTotal</MudText>
+@if(ShowHours){
+
+    <MudText Typo="Typo.h1">Hours Worked Today:</MudText>
+
+    <MudText Typo="@Typo.h3">Tech lead Hours</MudText>
+    <MudText Typo="@Typo.body1">@techLeadHoursTotal</MudText>
+    <MudText Typo="@Typo.h3">Regular Hours</MudText>
+    <MudText Typo="@Typo.body1">@regularHoursTotal</MudText>
+}
 
 
 @code {
@@ -36,13 +40,16 @@ using System.Diagnostics;
         private string PunchButtonText => punchIn ? "Punch in" : "Punch Out";
         private bool punchIn => lastPunch.PunchOut != null;
         private HourType punchType;
+        private bool ShowHours = false;
         private PunchRecord lastPunch = null!;
         private string techLeadHoursTotal = "0:00";
         private string regularHoursTotal = "0:00";
+        private IEnumerable<PunchRecord> todaysPunchs= null!;
 
         protected override async Task OnInitializedAsync()
         {
             lastPunch = await timePunchClient.GetLastPunch();
+            todaysPunchs = await timePunchClient.GetTodaysPunchs();
         }
 
         private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToLocalTime().ToString("MM:dd hh:mm tt");
@@ -56,14 +63,36 @@ using System.Diagnostics;
 
         private async Task PunchIn(){
             lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchIn);
+            todaysPunchs = await timePunchClient.GetTodaysPunchs();
+            CalculateHours();
             StateHasChanged();
         }
         private async Task PunchOut(){
             lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchOut);
+            todaysPunchs = await timePunchClient.GetTodaysPunchs();
             StateHasChanged();
         }
+
+        private void CalculateHours()
+        {
+            var groupedHours = Enum.GetValues(typeof(HourType))
+                .Cast<HourType>()
+                .ToDictionary(hourType =>
+                    hourType,
+                    hourType =>
+                    {
+                        var totalMinutes = todaysPunchs
+                            .Where(p => p.HourType == hourType && p.PunchOut.HasValue)
+                            .Select(p => (p.PunchOut.Value - p.PunchIn).TotalMinutes)
+                            .Sum();
+
+                        int hours = (int)(totalMinutes / 60);
+                        int minutes = (int)(totalMinutes % 60);
+
+                        return $"{hours:D2}:{minutes:D2}";
+                    });
+
+            techLeadHoursTotal = groupedHours.GetValueOrDefault(HourType.TechLead, "00:00");
+            regularHoursTotal = groupedHours.GetValueOrDefault(HourType.Regular, "00:00");
+        }
 }
-
-
-using Microsoft.VisualBasic;
-#line default
