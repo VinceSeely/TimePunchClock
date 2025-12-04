@@ -4,7 +4,7 @@
 <MudText Typo="@Typo.h3">October Summary - Tech lead Hours</MudText>
 <MudGrid>
     <MudItem xs="12" sm="6">
-        <MudSelect T="int" @Value="SelectedYear"
+        <MudSelect T="int" @value="SelectedYear"
                    ValueChanged="OnYearChanged"
                    Label="Year">
             @foreach (var y in Years)
@@ -16,7 +16,7 @@
 
     <MudItem xs="12" sm="6">
         <MudSelect T="MonthOption" Label="Month"
-                   @Value="SelectedMonth"
+                   @value="SelectedMonth"
                    ValueChanged="OnMonthChanged">
             @foreach (var m in Months)
             {
