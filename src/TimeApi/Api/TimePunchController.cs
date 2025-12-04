@@ -1,8 +1,10 @@
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using TimeApi.Constants;
 using TimeApi.Services;
 using TimeClock.Client;
 
@@ -15,6 +17,7 @@ namespace TimeApi.Api
 
 
         [HttpGet]
+        [Authorize(Policy = AuthorizationPolicies.HasAccount)]
         public ActionResult GetHours(DateTime start, DateTime end)
         {
             var results = punchRepository.GetPunchRecords(start, end);
@@ -26,6 +29,7 @@ namespace TimeApi.Api
         }
 
         [HttpPost()]
+        [Authorize]
         public ActionResult PunchHours(PunchInfo punchInfo)
         {
             punchRepository.InsertPunch(punchInfo);
@@ -36,6 +40,7 @@ namespace TimeApi.Api
         }
 
         [HttpGet("lastpunch")]
+        [Authorize]
         public ActionResult GetLastPunch()
         {
             var lastPunch = punchRepository.GetLastPunch();

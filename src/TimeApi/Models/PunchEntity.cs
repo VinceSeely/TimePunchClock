@@ -13,4 +13,6 @@ public class PunchEntity
     public HourType HourType { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string AuthId { get; set; }
+    public string DescriptionOfWorkDone { get; set; }
 }

@@ -1,65 +1,35 @@
 ﻿@page "/month-summary"
-@using TimeClock.Client
-@using System
+@using TimeClockUI.Models
 
 <MudText Typo="@Typo.h3">October Summary - Tech lead Hours</MudText>
+<MudGrid>
+    <MudItem xs="12" sm="6">
+        <MudSelect @bind-Value="SelectedYear" Label="Year" ValueChanged="OnYearChanged">
+            @foreach (var y in Years)
+            {
+                <MudSelectItem Value="@y">@y</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+
+    <MudItem xs="12" sm="6">
+        <MudSelect T="MonthOption" Label="Month"
+                   @bind-Value="SelectedMonth"
+                   ValueChanged="OnMonthChanged">
+            @foreach (var m in Months)
+            {
+                <MudSelectItem Value="@m">@m.Name</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+</MudGrid>
+
+<MudText Typo="Typo.subtitle2">
+    Selected Range: @StartDate.ToShortDateString() - @EndDate.ToShortDateString()
+</MudText>
+
 <MudText Typo="@Typo.body1">@techLeadHoursTotal</MudText>
 <MudText Typo="@Typo.h3">Regular Hours</MudText>
 <MudText Typo="@Typo.body1">@regularHoursTotal</MudText>
 <MudText Typo="@Typo.h3">Total Hours</MudText>
 <MudText Typo="@Typo.body1">@combinedHoursTotal</MudText>
-
-@code{
-    [Inject] public TimePunchClient timePunchClient { get; set; }
-   
-    private string techLeadHoursTotal = "0:00";
-    private string regularHoursTotal = "0:00";
-    private string combinedHoursTotal = "00:00";
-    private IEnumerable<PunchRecord> todaysPunchs= null!;
-    
-    protected override async Task OnInitializedAsync()
-    {
-        // Create July date range in CST
-        var startDate = new DateTime(DateTime.Now.Year, 10, 1, 0, 0, 0, DateTimeKind.Local);
-        var endDate = new DateTime(DateTime.Now.Year, 10, 31, 23, 59, 59, DateTimeKind.Local);
-
-        // Convert from CST to UTC
-        var startDateUtc = TimeZoneInfo.ConvertTimeToUtc(startDate);
-        var endDateUtc = TimeZoneInfo.ConvertTimeToUtc(endDate);
-
-        todaysPunchs = await timePunchClient.GetPunchesRange(startDate, endDate);
-        CalculateAndSetHours();
-    }
-    
-    private void CalculateAndSetHours()
-    {
-        var groupedHours = Enum.GetValues(typeof(HourType))
-            .Cast<HourType>()
-            .ToDictionary(hourType =>
-                    hourType,
-                hourType =>
-                {
-                    var totalMinutes = todaysPunchs
-                        .Where(p => p.HourType == hourType && p.PunchOut.HasValue)
-                        .Select(p => (p.PunchOut.Value - p.PunchIn).TotalMinutes)
-                        .Sum();
-
-                    int hours = (int)(totalMinutes / 60);
-                    int minutes = (int)(totalMinutes % 60);
-
-                    return (hours, minutes);
-                });
-
-        var (techHours, techMins) = groupedHours.GetValueOrDefault(HourType.TechLead, (0, 0));
-        var (regHours, regMins) = groupedHours.GetValueOrDefault(HourType.Regular, (0, 0));
-
-        techLeadHoursTotal = $"{techHours:D2}:{techMins:D2}";
-        regularHoursTotal  = $"{regHours:D2}:{regMins:D2}";
-
-        int combinedMinutes = techHours * 60 + techMins + regHours * 60 + regMins;
-        int totalHours = combinedMinutes / 60;
-        int totalMins = combinedMinutes % 60;
-
-        combinedHoursTotal = $"{totalHours:D2}:{totalMins:D2}";
-    } 
-}
