@@ -12,7 +12,7 @@ namespace TimeApi.Api
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class TimePunchController(TimePunchRepository punchRepository) : ControllerBase
+    public class TimePunchController(ITimePunchRepository punchRepository) : ControllerBase
     {
 
 
@@ -44,6 +44,11 @@ namespace TimeApi.Api
         public ActionResult GetLastPunch()
         {
             var lastPunch = punchRepository.GetLastPunch();
+
+            if (lastPunch == null)
+            {
+                return NotFound(new { message = "No punch records found" });
+            }
 
             return Ok(lastPunch);
         }

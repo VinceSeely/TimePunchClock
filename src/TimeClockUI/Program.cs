@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Authentication.WebAssembly.Msal;
 using MudBlazor.Services;
 using TimeClock.Client;
 using TimeClockUI;
@@ -19,6 +20,14 @@ if (string.IsNullOrEmpty(apiBaseUrl))
 
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
+
+// Configure Azure AD MSAL authentication
+builder.Services.AddMsalAuthentication(options =>
+{
+    builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
+    options.ProviderOptions.DefaultAccessTokenScopes.Add(builder.Configuration["Api:Scopes:0"] ?? "");
+});
+
 builder.Services.RegsiterTimeClient(builder.Configuration);
 builder.Services.AddMudServices();
 

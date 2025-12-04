@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"c:\\repos\\timeClock\\src\\TimeClock.client\" -name \"*.cs\" ! -path \"*/obj/*\" -exec bash -c 'echo \"\"=== $1 ===\"\"; cat \"\"$1\"\"' _ {} ;)",
+      "Bash(dotnet test:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

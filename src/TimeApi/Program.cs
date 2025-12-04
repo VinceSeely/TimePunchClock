@@ -19,7 +19,7 @@ builder.Services.AddCors(options =>
              .AllowAnyHeader();
     });
 });
-builder.Services.AddScoped<TimePunchRepository>();
+builder.Services.AddScoped<ITimePunchRepository, TimePunchRepository>();
 
 //TODO add proper registration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -50,3 +50,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+// Make Program class accessible for integration testing
+public partial class Program { }
