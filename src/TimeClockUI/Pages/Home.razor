@@ -56,7 +56,7 @@
             CalculateAndSetHours();
         }
 
-        private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToLocalTime().ToString("MM:dd hh:mm tt");
+        private string GetLastPunchTimeString() => (lastPunch.PunchOut ?? lastPunch.PunchIn).ToLocalTime().ToString("MM/dd hh:mm tt");
 
         private string GetPunchTypeDisplayString(HourType type) => 
             type switch {
