@@ -8,10 +8,12 @@ public partial class Home
     [Inject] public TimePunchClient timePunchClient { get; set; } = null!;
 
     private string DisplayNextPunchStatus =>
-        $"Please Punch {(punchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
+        lastPunch == null
+            ? "Loading..."
+            : $"Please Punch {(punchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
 
     private string PunchButtonText => punchIn ? "Punch in" : "Punch Out";
-    private bool punchIn => lastPunch.PunchOut != null;
+    private bool punchIn => lastPunch?.PunchOut != null;
     private HourType punchType;
     private bool ShowHours = false;
     private PunchRecord lastPunch = null!;
@@ -27,8 +29,12 @@ public partial class Home
         CalculateAndSetHours();
     }
 
-    private string GetLastPunchTimeString() =>
-        (lastPunch.PunchOut ?? lastPunch.PunchIn).ToLocalTime().ToString("MM/dd hh:mm tt");
+    private string GetLastPunchTimeString()
+    {
+        if (lastPunch == null) return "N/A";
+        var punchTime = lastPunch.PunchOut ?? lastPunch.PunchIn;
+        return punchTime.ToLocalTime().ToString("MM/dd hh:mm tt");
+    }
 
     private string GetPunchTypeDisplayString(HourType type) =>
         type switch
@@ -56,6 +62,11 @@ public partial class Home
 
     private void CalculateAndSetHours()
     {
+        if (todaysPunchs == null)
+        {
+            todaysPunchs = Enumerable.Empty<PunchRecord>();
+        }
+
         var groupedHours = Enum.GetValues(typeof(HourType))
             .Cast<HourType>()
             .ToDictionary(hourType =>

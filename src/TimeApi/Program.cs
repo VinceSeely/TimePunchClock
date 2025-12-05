@@ -28,34 +28,40 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add Authentication & Authorization
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        // Support both local IdentityServer and Azure AD
-        var authority = builder.Environment.IsDevelopment()
-            ? builder.Configuration["IdentityServer:Authority"]
-            : builder.Configuration["AzureAd:Authority"];
+// Check if authentication is enabled (default to true for production)
+var authEnabled = builder.Configuration.GetValue<bool>("Authentication:Enabled", true);
 
-        options.Authority = authority;
-        options.Audience = builder.Configuration["AzureAd:Audience"];
-
-        options.TokenValidationParameters = new TokenValidationParameters
+if (authEnabled)
+{
+    // Add Authentication & Authorization
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            ValidateAudience = !builder.Environment.IsDevelopment(), // Disable for local dev
-            ValidateIssuer = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true
-        };
+            // Support both local IdentityServer and Azure AD
+            var authority = builder.Environment.IsDevelopment()
+                ? builder.Configuration["IdentityServer:Authority"]
+                : builder.Configuration["AzureAd:Authority"];
 
-        // For local development with IdentityServer
-        if (builder.Environment.IsDevelopment())
-        {
-            options.RequireHttpsMetadata = false;
-        }
-    });
+            options.Authority = authority;
+            options.Audience = builder.Configuration["AzureAd:Audience"];
 
-builder.Services.AddAuthorization();
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateAudience = !builder.Environment.IsDevelopment(), // Disable for local dev
+                ValidateIssuer = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true
+            };
+
+            // For local development with IdentityServer
+            if (builder.Environment.IsDevelopment())
+            {
+                options.RequireHttpsMetadata = false;
+            }
+        });
+
+    builder.Services.AddAuthorization();
+}
 
 builder.Services.AddScoped<ITimePunchRepository, TimePunchRepository>();
 
@@ -77,8 +83,11 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();
-app.UseAuthorization();
+if (authEnabled)
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
 
 // Map controller endpoints
 app.MapControllers();

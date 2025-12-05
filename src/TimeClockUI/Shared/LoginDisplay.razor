@@ -1,25 +1,34 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.Extensions.Configuration
 @inject NavigationManager Navigation
+@inject IConfiguration Configuration
 
-<AuthorizeView>
-    <Authorized>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudText Typo="Typo.body2">Hello, @GetUserName(context)</MudText>
-            <MudButton Variant="Variant.Text"
+@{
+    var authEnabled = Configuration.GetValue<bool>("Authentication:Enabled", true);
+}
+
+@if (authEnabled)
+{
+    <AuthorizeView>
+        <Authorized>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.body2">Hello, @GetUserName(context)</MudText>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           Href="authentication/logout">
+                    Logout
+                </MudButton>
+            </MudStack>
+        </Authorized>
+        <NotAuthorized>
+            <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
-                       Href="authentication/logout">
-                Logout
+                       Href="authentication/login">
+                Login
             </MudButton>
-        </MudStack>
-    </Authorized>
-    <NotAuthorized>
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   Href="authentication/login">
-            Login
-        </MudButton>
-    </NotAuthorized>
-</AuthorizeView>
+        </NotAuthorized>
+    </AuthorizeView>
+}
 
 @code {
     private string GetUserName(AuthenticationState state)

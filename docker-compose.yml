@@ -11,6 +11,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
+      - Authentication__Enabled=false
       - ConnectionStrings__DefaultConnection=Server=mssql;Database=TimeClockDB;User Id=sa;Password=Your_Strong_Password123!;TrustServerCertificate=True;
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
@@ -22,21 +23,8 @@ services:
     networks:
       - timeclock-network
 
-  identityserver:
-    image: identityserver
-    build:
-      context: ./IdentityServer/TimeClock.IdentityServer
-      dockerfile: Dockerfile
-    container_name: timeclock-identityserver
-    ports:
-      - "5002:80"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:80
-    networks:
-      - timeclock-network
-    depends_on:
-      - mssql
+  # IdentityServer removed - authentication disabled for local development
+  # For production, Azure AD will be used via Terraform configuration
 
   timeclockui:
     image: timeclockui
@@ -46,12 +34,12 @@ services:
     ports:
       - "5001:80"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Authentication__Enabled=false
       # For Blazor WASM, we need to use the public-facing URL that the browser will use
       - TimeClientBaseUrl=http://localhost:5000
-      - AuthUrl=http://localhost:5000/auth
     depends_on:
       - timeapi
-      - identityserver
     networks:
       - timeclock-network
 

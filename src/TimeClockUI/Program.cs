@@ -21,36 +21,42 @@ if (string.IsNullOrEmpty(apiBaseUrl))
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Configure authentication based on AuthProvider setting
-var authProvider = builder.Configuration["AuthProvider"] ?? "Oidc";
+// Check if authentication is enabled (default to true for production)
+var authEnabled = builder.Configuration.GetValue<bool>("Authentication:Enabled", true);
 
-if (authProvider == "AzureAd")
+if (authEnabled)
 {
-    builder.Services.AddMsalAuthentication(options =>
-    {
-        builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
+    // Configure authentication based on AuthProvider setting
+    var authProvider = builder.Configuration["AuthProvider"] ?? "Oidc";
 
-        // Add the API scope
-        var apiScope = builder.Configuration["Api:Scopes:0"];
-        if (!string.IsNullOrEmpty(apiScope))
-        {
-            options.ProviderOptions.DefaultAccessTokenScopes.Add(apiScope);
-        }
-    });
-}
-else
-{
-    builder.Services.AddOidcAuthentication(options =>
+    if (authProvider == "AzureAd")
     {
-        builder.Configuration.Bind("Oidc", options.ProviderOptions);
-
-        // Add the API scope
-        var apiScope = builder.Configuration["Api:Scopes:0"];
-        if (!string.IsNullOrEmpty(apiScope))
+        builder.Services.AddMsalAuthentication(options =>
         {
-            options.ProviderOptions.DefaultScopes.Add(apiScope);
-        }
-    });
+            builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
+
+            // Add the API scope
+            var apiScope = builder.Configuration["Api:Scopes:0"];
+            if (!string.IsNullOrEmpty(apiScope))
+            {
+                options.ProviderOptions.DefaultAccessTokenScopes.Add(apiScope);
+            }
+        });
+    }
+    else
+    {
+        builder.Services.AddOidcAuthentication(options =>
+        {
+            builder.Configuration.Bind("Oidc", options.ProviderOptions);
+
+            // Add the API scope
+            var apiScope = builder.Configuration["Api:Scopes:0"];
+            if (!string.IsNullOrEmpty(apiScope))
+            {
+                options.ProviderOptions.DefaultScopes.Add(apiScope);
+            }
+        });
+    }
 }
 
 builder.Services.RegsiterTimeClient(builder.Configuration);

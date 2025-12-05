@@ -9,11 +9,19 @@ public static class TimepunchServiceExtensions
     {
         var baseUrl = config.GetValue<String>(Constants.TimeClientBaseUrl) ?? string.Empty;
         Console.WriteLine("base url: " + baseUrl);
-        
-        services.AddHttpClient(Constants.TimeClientString, client =>
+
+        var authEnabled = config.GetValue<bool>("Authentication:Enabled", true);
+
+        var httpClient = services.AddHttpClient(Constants.TimeClientString, client =>
         {
             client.BaseAddress = new Uri(baseUrl);
-        }).AddHttpMessageHandler<BaseAddressAuthorizationMessageHandler>();
+        });
+
+        if (authEnabled)
+        {
+            httpClient.AddHttpMessageHandler<BaseAddressAuthorizationMessageHandler>();
+        }
+
         services.AddScoped<TimePunchClient>();
         return services;
     }

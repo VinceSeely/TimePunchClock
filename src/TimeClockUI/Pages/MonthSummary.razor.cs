@@ -6,7 +6,7 @@ namespace TimeClockUI.Pages;
 
 public partial class MonthSummary
 {
-    [Inject] public TimePunchClient timePunchClient { get; set; }
+    [Inject] public TimePunchClient timePunchClient { get; set; } = null!;
 
     private List<MonthOption> Months = new()
     {
@@ -36,14 +36,19 @@ public partial class MonthSummary
 
     protected override async Task OnInitializedAsync()
     {
-        // Create July date range in CST
+        // Initialize with current month
+        SelectedMonth = Months[DateTime.Now.Month - 1];
+        SelectedYear = DateTime.Now.Year;
+
+        StartDate = new(SelectedYear, SelectedMonth.Month, 1);
+        EndDate = StartDate.AddMonths(1).AddDays(-1);
 
         await CalculateHours();
     }
 
     private async Task CalculateHours()
     {
-        todaysPunchs = await timePunchClient.GetPunchesRange(StartDate, EndDate);
+        todaysPunchs = await timePunchClient.GetPunchesRange(StartDate, EndDate) ?? Enumerable.Empty<PunchRecord>();
         CalculateAndSetHours();
     }
 
