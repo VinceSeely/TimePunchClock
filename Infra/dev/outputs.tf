@@ -117,6 +117,10 @@ output "azuread_configuration_summary" {
       - http://localhost:5000/authentication/login-callback
       - https://${azurerm_static_web_app.blazor.default_host_name}/authentication/login-callback
 
+  CORS Configuration:
+    Allowed Origins: ${join(", ", var.cors_allowed_origins)}
+    To update: Add -var="cors_allowed_origins=[\"https://yourdomain.com\"]" to terraform apply
+
   All configuration values are also stored in Key Vault: ${azurerm_key_vault.kv.name}
   EOT
 }

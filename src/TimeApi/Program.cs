@@ -12,16 +12,14 @@ builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
 // Add CORS configuration for frontend
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-            "http://localhost:5001",
-            "https://localhost:5001",
-            "http://localhost:5173",
-            builder.Configuration["Frontend:Url"] ?? ""
-        )
+        policy.WithOrigins(allowedOrigins)
         .AllowAnyMethod()
         .AllowAnyHeader()
         .AllowCredentials();
@@ -62,6 +60,16 @@ if (authEnabled)
 
     builder.Services.AddAuthorization();
 }
+else
+{
+    // When auth is disabled, add a permissive authorization policy
+    builder.Services.AddAuthorization(options =>
+    {
+        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAssertion(_ => true) // Always allow
+            .Build();
+    });
+}
 
 builder.Services.AddScoped<ITimePunchRepository, TimePunchRepository>();
 
@@ -83,11 +91,13 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
+// Always use authorization middleware (even when auth is disabled)
+// When disabled, the permissive policy will allow all requests
 if (authEnabled)
 {
     app.UseAuthentication();
-    app.UseAuthorization();
 }
+app.UseAuthorization();
 
 // Map controller endpoints
 app.MapControllers();

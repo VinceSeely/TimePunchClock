@@ -20,3 +20,8 @@ azuread_admin_object_id = ""
 
 # Your IP address for SQL firewall access (optional, set to 0.0.0.0 to disable)
 my_ip_address = "0.0.0.0"
+
+# CORS allowed origins for the backend API
+# Add the Static Web App URL after deployment
+# Example: cors_allowed_origins = ["https://your-static-web-app.azurestaticapps.net"]
+cors_allowed_origins = []

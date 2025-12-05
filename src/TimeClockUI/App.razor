@@ -3,8 +3,6 @@
 @using TimeClockUI.Layout;
 @using Microsoft.Extensions.Configuration
 @inject IConfiguration Configuration
-#line default
-#line hidden
 
 @{
     var authEnabled = Configuration.GetValue<bool>("Authentication:Enabled", true);

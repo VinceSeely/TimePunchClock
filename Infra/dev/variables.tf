@@ -43,3 +43,9 @@ variable "backend_dns_label" {
   type        = string
   default     = ""
 }
+
+variable "cors_allowed_origins" {
+  description = "List of allowed CORS origins for the backend API"
+  type        = list(string)
+  default     = []
+}

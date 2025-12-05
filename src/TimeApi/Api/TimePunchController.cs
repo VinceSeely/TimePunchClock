@@ -17,7 +17,7 @@ namespace TimeApi.Api
 
 
         [HttpGet]
-        [Authorize(Policy = AuthorizationPolicies.HasAccount)]
+        [Authorize]
         public ActionResult GetHours(DateTime start, DateTime end)
         {
             var results = punchRepository.GetPunchRecords(start, end);

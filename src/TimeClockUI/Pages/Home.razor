@@ -9,25 +9,25 @@
 <h1>@DisplayNextPunchStatus</h1>
 
 <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
-<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@punchIn">Punch Out</MudButton>
+<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@_ShouldPunchIn">Punch Out</MudButton>
 <MudText Typo="@Typo.h4">Hours Type:</MudText>
-<MudSelect Label="Show Hours" @bind-Value="@punchType"> 
+<MudSelect Label="Show Hours" @bind-Value="@_punchType"> 
     @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))
     {
         <MudSelectItem Value="@hourType">@GetPunchTypeDisplayString(hourType)</MudSelectItem>
     }
 </MudSelect>
 
-<MudSwitch  @bind-value="@ShowHours"></MudSwitch >
+<MudSwitch @bind-value="@_showHours"></MudSwitch >
 
-@if(ShowHours){
+@if(_showHours){
 
     <MudText Typo="Typo.h1">Hours Worked Today:</MudText>
 
     <MudText Typo="@Typo.h3">Tech lead Hours</MudText>
-    <MudText Typo="@Typo.body1">@techLeadHoursTotal</MudText>
+    <MudText Typo="@Typo.body1">@_techLeadHoursTotal</MudText>
     <MudText Typo="@Typo.h3">Regular Hours</MudText>
-    <MudText Typo="@Typo.body1">@regularHoursTotal</MudText>
+    <MudText Typo="@Typo.body1">@_regularHoursTotal</MudText>
     <MudText Typo="@Typo.h3">Total Hours</MudText>
-    <MudText Typo="@Typo.body1">@combinedHoursTotal</MudText>
+    <MudText Typo="@Typo.body1">@_combinedHoursTotal</MudText>
 }

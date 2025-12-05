@@ -12,6 +12,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - Authentication__Enabled=false
+      - Cors__AllowedOrigins__0=http://localhost:5001
+      - Cors__AllowedOrigins__1=https://localhost:5001
       - ConnectionStrings__DefaultConnection=Server=mssql;Database=TimeClockDB;User Id=sa;Password=Your_Strong_Password123!;TrustServerCertificate=True;
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro

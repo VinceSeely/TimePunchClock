@@ -5,34 +5,32 @@ namespace TimeClockUI.Pages;
 
 public partial class Home
 {
-    [Inject] public TimePunchClient timePunchClient { get; set; } = null!;
+    [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
 
     private string DisplayNextPunchStatus =>
-        lastPunch == null
-            ? "Loading..."
-            : $"Please Punch {(punchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
+        $"Please Punch {(_ShouldPunchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
 
-    private string PunchButtonText => punchIn ? "Punch in" : "Punch Out";
-    private bool punchIn => lastPunch?.PunchOut != null;
-    private HourType punchType;
-    private bool ShowHours = false;
-    private PunchRecord lastPunch = null!;
-    private string techLeadHoursTotal = "0:00";
-    private string regularHoursTotal = "0:00";
-    private string combinedHoursTotal = "00:00";
-    private IEnumerable<PunchRecord> todaysPunchs = null!;
+    private string PunchButtonText => _ShouldPunchIn ? "Punch in" : "Punch Out";
+    private bool _ShouldPunchIn=> _lastPunch?.PunchOut != null;
+    private HourType _punchType;
+    private bool _showHours = false;
+    private PunchRecord? _lastPunch;
+    private string _techLeadHoursTotal = "0:00";
+    private string _regularHoursTotal = "0:00";
+    private string _combinedHoursTotal = "00:00";
+    private IEnumerable<PunchRecord> _todaysPunchs = null!;
 
     protected override async Task OnInitializedAsync()
     {
-        lastPunch = await timePunchClient.GetLastPunch();
-        todaysPunchs = await timePunchClient.GetTodaysPunchs();
+        _lastPunch = await TimePunchClient.GetLastPunch();
+        _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
         CalculateAndSetHours();
     }
 
     private string GetLastPunchTimeString()
     {
-        if (lastPunch == null) return "N/A";
-        var punchTime = lastPunch.PunchOut ?? lastPunch.PunchIn;
+        if (_lastPunch == null) return "N/A";
+        var punchTime = _lastPunch.PunchOut ?? _lastPunch.PunchIn;
         return punchTime.ToLocalTime().ToString("MM/dd hh:mm tt");
     }
 
@@ -46,34 +44,29 @@ public partial class Home
 
     private async Task PunchIn()
     {
-        lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchIn);
-        todaysPunchs = await timePunchClient.GetTodaysPunchs();
+        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchIn);
+        _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
         CalculateAndSetHours();
         StateHasChanged();
     }
 
     private async Task PunchOut()
     {
-        lastPunch = await timePunchClient.Punch(punchType, PunchType.PunchOut);
-        todaysPunchs = await timePunchClient.GetTodaysPunchs();
+        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchOut);
+        _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
         CalculateAndSetHours();
         StateHasChanged();
     }
 
     private void CalculateAndSetHours()
     {
-        if (todaysPunchs == null)
-        {
-            todaysPunchs = Enumerable.Empty<PunchRecord>();
-        }
-
         var groupedHours = Enum.GetValues(typeof(HourType))
             .Cast<HourType>()
             .ToDictionary(hourType =>
                     hourType,
                 hourType =>
                 {
-                    var totalMinutes = todaysPunchs
+                    var totalMinutes = _todaysPunchs
                         .Where(p => p.HourType == hourType && p.PunchOut.HasValue)
                         .Select(p => (p.PunchOut.Value - p.PunchIn).TotalMinutes)
                         .Sum();
@@ -87,13 +80,13 @@ public partial class Home
         var (techHours, techMins) = groupedHours.GetValueOrDefault(HourType.TechLead, (0, 0));
         var (regHours, regMins) = groupedHours.GetValueOrDefault(HourType.Regular, (0, 0));
 
-        techLeadHoursTotal = $"{techHours:D2}:{techMins:D2}";
-        regularHoursTotal = $"{regHours:D2}:{regMins:D2}";
+        _techLeadHoursTotal = $"{techHours:D2}:{techMins:D2}";
+        _regularHoursTotal = $"{regHours:D2}:{regMins:D2}";
 
         var combinedMinutes = techHours * 60 + techMins + regHours * 60 + regMins;
         var totalHours = combinedMinutes / 60;
         var totalMins = combinedMinutes % 60;
 
-        combinedHoursTotal = $"{totalHours:D2}:{totalMins:D2}";
+        _combinedHoursTotal = $"{totalHours:D2}:{totalMins:D2}";
     }
 }

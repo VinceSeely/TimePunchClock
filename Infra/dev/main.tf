@@ -172,9 +172,17 @@ resource "azurerm_container_group" "backend" {
       protocol = "TCP"
     }
 
-    environment_variables = {
-      ASPNETCORE_ENVIRONMENT = local.environment
-    }
+    environment_variables = merge(
+      {
+        ASPNETCORE_ENVIRONMENT = local.environment
+        Authentication__Enabled = "true"
+      },
+      # Add CORS allowed origins as indexed environment variables
+      length(var.cors_allowed_origins) > 0 ? {
+        for idx, origin in var.cors_allowed_origins :
+        "Cors__AllowedOrigins__${idx}" => origin
+      } : {}
+    )
 
     secure_environment_variables = {
       ConnectionStrings__DefaultConnection = azurerm_key_vault_secret.sql_connection_string.value

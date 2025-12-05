@@ -9,21 +9,38 @@ public class TimePunchClient(IHttpClientFactory clientFactory)
     public async Task<IEnumerable<PunchRecord>> GetTodaysPunchs(CancellationToken cancellationToken = default)
     {
         var client = clientFactory.CreateClient(Constants.TimeClientString);
-        var timePunchResults = await client.GetAsync($"{Constants.TimePunchApi}?start={DateTime.Today}&end={DateTime.Today}", cancellationToken);
-        var timePunchesJson = await timePunchResults.Content.ReadAsStringAsync();
+        try
+        {
+            var timePunchResults =
+                await client.GetAsync($"{Constants.TimePunchApi}?start={DateTime.Today}&end={DateTime.Today}",
+                    cancellationToken);
+            var timePunchesJson = await timePunchResults.Content.ReadAsStringAsync();
 
-        var timePunches = JsonConvert.DeserializeObject<PunchRecord[]>(timePunchesJson) ?? [];
-        return timePunches;
-
+            var timePunches = JsonConvert.DeserializeObject<PunchRecord[]>(timePunchesJson) ?? [];
+            return timePunches;
+        }
+        catch
+        {
+            // ignored
+        }
+        return [];
     }
 
-    public async Task<PunchRecord> GetLastPunch()
+    public async Task<PunchRecord?> GetLastPunch()
     {
         var client = clientFactory.CreateClient(Constants.TimeClientString);
-        var timePunchResults = await client.GetAsync($"{Constants.TimePunchApi}/lastpunch");
-        var timePunchJson = await timePunchResults.Content.ReadAsStringAsync();
-        var timePunch = JsonConvert.DeserializeObject<PunchRecord>(timePunchJson) ?? new PunchRecord();
-        return timePunch;
+        try
+        {
+            var timePunchResults = await client.GetAsync($"{Constants.TimePunchApi}/lastpunch");
+            var timePunchJson = await timePunchResults.Content.ReadAsStringAsync();
+            var timePunch = JsonConvert.DeserializeObject<PunchRecord>(timePunchJson) ?? new PunchRecord();
+            return timePunch;
+        }
+        catch
+        {
+            // ignore
+        }
+        return null;
     }
 
     public async Task<PunchRecord> Punch(HourType hourType, PunchType punchType)
@@ -47,11 +64,22 @@ public class TimePunchClient(IHttpClientFactory clientFactory)
     public async Task<IEnumerable<PunchRecord>> GetPunchesRange(DateTime start, DateTime end, CancellationToken cancellationToken = default)
     {
         var client = clientFactory.CreateClient(Constants.TimeClientString);
-        var timePunchResults = await client.GetAsync($"{Constants.TimePunchApi}?start={start}&end={end}", cancellationToken);
-        var timePunchesJson = await timePunchResults.Content.ReadAsStringAsync();
+        try
+        {
+            var timePunchResults =
+                await client.GetAsync($"{Constants.TimePunchApi}?start={start}&end={end}", cancellationToken);
+            var timePunchesJson = await timePunchResults.Content.ReadAsStringAsync();
 
-        var timePunches = JsonConvert.DeserializeObject<PunchRecord[]>(timePunchesJson) ?? [];
-        return timePunches;
+
+            var timePunches = JsonConvert.DeserializeObject<PunchRecord[]>(timePunchesJson) ?? [];
+            return timePunches;
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return [];
 
     }
 
