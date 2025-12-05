@@ -28,7 +28,8 @@ public class TimePunchRepository(TimeClockDbContext context) : ITimePunchReposit
             newPunch = new PunchEntity
             {
                 PunchIn = DateTime.Now,
-                HourType = punch.HourType
+                HourType = punch.HourType,
+                WorkDescription = punch.WorkDescription
             };
             context.Punchs.Add(newPunch);
         }
@@ -42,7 +43,9 @@ public class TimePunchRepository(TimeClockDbContext context) : ITimePunchReposit
             PunchIn = x.PunchIn,
             PunchOut = x.PunchOut.Value,
             HourType = x.HourType,
-            PunchId = x.PunchId
+            PunchId = x.PunchId,
+            AuthId = x.AuthId,
+            WorkDescription = x.WorkDescription
         });
         return query;
     }
@@ -64,7 +67,9 @@ public class TimePunchRepository(TimeClockDbContext context) : ITimePunchReposit
             PunchIn = mostRecentPunch.PunchIn,
             PunchOut = mostRecentPunch.PunchOut,
             PunchId = mostRecentPunch.PunchId,
-            HourType = mostRecentPunch.HourType
+            HourType = mostRecentPunch.HourType,
+            AuthId = mostRecentPunch.AuthId,
+            WorkDescription = mostRecentPunch.WorkDescription
         };
     }
 }

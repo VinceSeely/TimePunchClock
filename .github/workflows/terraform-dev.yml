@@ -12,12 +12,12 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: write  # For Infracost comments
 
 jobs:
-  terraform-deploy:
-    name: Deploy Dev Infrastructure
+  terraform-plan:
+    name: Plan Dev Infrastructure
     runs-on: ubuntu-latest
-    environment: dev
 
     steps:
       - name: Checkout code
@@ -27,6 +27,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.0
+          terraform_wrapper: false  # Required for Infracost
 
       - name: Azure Login
         uses: azure/login@v1
@@ -50,6 +51,72 @@ jobs:
       - name: Terraform Plan
         working-directory: ./Infra/dev
         run: terraform plan -out=tfplan
+
+      - name: Generate Plan JSON for Infracost
+        working-directory: ./Infra/dev
+        run: terraform show -json tfplan > plan.json
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost Cost Estimate
+        run: |
+          infracost breakdown --path ./Infra/dev/plan.json \
+            --format json \
+            --out-file /tmp/infracost.json
+
+      - name: Post Cost Estimate to Summary
+        run: |
+          infracost output --path /tmp/infracost.json --format github-comment --out-file /tmp/infracost_comment.md
+          cat /tmp/infracost_comment.md >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "Review the cost estimate above and approve the deployment in the Actions tab to proceed." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            Infra/dev/tfplan
+            Infra/dev/.terraform/
+          retention-days: 5
+
+  terraform-deploy:
+    name: Deploy Dev Infrastructure
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment: dev  # This requires manual approval
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: ./Infra/dev
+        run: terraform init
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: Infra/dev/
 
       - name: Terraform Apply
         working-directory: ./Infra/dev

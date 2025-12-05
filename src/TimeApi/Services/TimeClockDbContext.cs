@@ -23,8 +23,9 @@ public class TimeClockDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("GETDATE()");
 
-            // Create an index on PunchIn for improved query performance
+            // Create indexes for improved query performance
             entity.HasIndex(e => e.PunchIn);
+            entity.HasIndex(e => e.AuthId);
         });
     }
 }

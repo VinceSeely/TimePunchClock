@@ -6,4 +6,6 @@ public record PunchRecord
     public DateTime PunchIn { get; init; }
     public DateTime? PunchOut { get; init; }
     public HourType HourType { get; init; }
+    public string? AuthId { get; init; }
+    public string? WorkDescription { get; init; }
 }

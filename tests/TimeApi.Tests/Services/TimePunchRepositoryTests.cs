@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using TimeApi.Models;
 using TimeApi.Services;
+using TimeApi.Tests.Fixtures;
 using TimeClock.Client;
 
 namespace TimeApi.Tests.Services;
@@ -57,20 +58,11 @@ public class TimePunchRepositoryTests
     public void InsertPunch_PunchOut_ClosesExistingOpenRecord()
     {
         // Arrange
-        var punchIn = new PunchEntity
-        {
-            PunchIn = DateTime.Now.AddHours(-2),
-            HourType = HourType.Regular,
-            PunchOut = null
-        };
+        var punchIn = TestDataFactory.CreateOpenPunch(HourType.Regular);
         _context.Punchs.Add(punchIn);
         _context.SaveChanges();
 
-        var punchOutInfo = new PunchInfo
-        {
-            PunchType = PunchType.PunchOut,
-            HourType = HourType.Regular
-        };
+        var punchOutInfo = TestDataFactory.CreatePunchInfo(PunchType.PunchOut, HourType.Regular);
 
         // Act
         _repository.InsertPunch(punchOutInfo);
@@ -85,12 +77,7 @@ public class TimePunchRepositoryTests
     public void InsertPunch_PunchOut_DoesNotCreateNewRecord_WhenOpenPunchExists()
     {
         // Arrange
-        var punchIn = new PunchEntity
-        {
-            PunchIn = DateTime.Now.AddHours(-2),
-            HourType = HourType.Regular,
-            PunchOut = null
-        };
+        var punchIn = TestDataFactory.CreateOpenPunch(HourType.Regular);
         _context.Punchs.Add(punchIn);
         _context.SaveChanges();
 
@@ -396,15 +383,10 @@ public class TimePunchRepositoryTests
     }
 
     [Test]
-    public void GetLastPunch_ReturnsOpenPunch_WhenPunchOutIsNull()
+    public void GetLastPunch_Repository_ReturnsOpenPunch_WhenPunchOutIsNull()
     {
         // Arrange
-        var openPunch = new PunchEntity
-        {
-            PunchIn = DateTime.Now.AddHours(-2),
-            PunchOut = null,
-            HourType = HourType.Regular
-        };
+        var openPunch = TestDataFactory.CreateOpenPunch(HourType.Regular);
         _context.Punchs.Add(openPunch);
         _context.SaveChanges();
 
@@ -417,15 +399,10 @@ public class TimePunchRepositoryTests
     }
 
     [Test]
-    public void GetLastPunch_ReturnsClosedPunch_WhenPunchOutIsSet()
+    public void GetLastPunch_Repository_ReturnsClosedPunch_WhenPunchOutIsSet()
     {
         // Arrange
-        var closedPunch = new PunchEntity
-        {
-            PunchIn = DateTime.Now.AddHours(-8),
-            PunchOut = DateTime.Now,
-            HourType = HourType.Regular
-        };
+        var closedPunch = TestDataFactory.CreateClosedPunch(hourType: HourType.Regular);
         _context.Punchs.Add(closedPunch);
         _context.SaveChanges();
 
@@ -435,7 +412,8 @@ public class TimePunchRepositoryTests
         // Assert
         result.Should().NotBeNull();
         result!.PunchOut.Should().NotBeNull();
-        result.PunchOut.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
+        result.PunchIn.Should().Be(closedPunch.PunchIn);
+        result.PunchOut.Should().Be(closedPunch.PunchOut);
     }
 
     [Test]

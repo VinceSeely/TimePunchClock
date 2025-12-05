@@ -304,7 +304,7 @@ public class TimePunchControllerTests
     }
 
     [Test]
-    public void GetLastPunch_ReturnsOpenPunch_WhenPunchOutIsNull()
+    public void GetLastPunch_Controller_ReturnsOpenPunch_WhenPunchOutIsNull()
     {
         // Arrange
         var openPunch = new PunchRecord
@@ -329,7 +329,7 @@ public class TimePunchControllerTests
     }
 
     [Test]
-    public void GetLastPunch_ReturnsClosedPunch_WhenPunchOutIsSet()
+    public void GetLastPunch_Controller_ReturnsClosedPunch_WhenPunchOutIsSet()
     {
         // Arrange
         var closedPunch = new PunchRecord
