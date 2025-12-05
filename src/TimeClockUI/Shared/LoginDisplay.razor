@@ -1,0 +1,32 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+
+<AuthorizeView>
+    <Authorized>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.body2">Hello, @GetUserName(context)</MudText>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       Href="authentication/logout">
+                Logout
+            </MudButton>
+        </MudStack>
+    </Authorized>
+    <NotAuthorized>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Href="authentication/login">
+            Login
+        </MudButton>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private string GetUserName(AuthenticationState state)
+    {
+        return state.User.Identity?.Name
+            ?? state.User.FindFirst("preferred_username")?.Value
+            ?? state.User.FindFirst("email")?.Value
+            ?? "User";
+    }
+}

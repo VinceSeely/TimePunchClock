@@ -1,4 +1,4 @@
-﻿FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy csproj files and restore dependencies
@@ -35,5 +35,5 @@ RUN chmod +x /docker-entrypoint.sh && \
 COPY TimeClockUI/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
-# Execute the script on container startup
-CMD /docker-entrypoint.sh && nginx -g "daemon off;"
+# Execute the script on container startup (script will start nginx)
+CMD ["/docker-entrypoint.sh"]

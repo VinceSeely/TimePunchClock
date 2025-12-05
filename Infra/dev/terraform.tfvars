@@ -1,29 +1,22 @@
-# Copy this file to terraform.tfvars and fill in your values
+# Terraform variables for dev environment
+# Most values are auto-generated from locals.tf
+# Only specify these if you need to override defaults
 
-resource_group_name = "rg-blazor-app"
-location            = "eastus"
-environment         = "dev"
+# Optional: Specify custom SQL server name (otherwise auto-generated)
+# sql_server_name = "sql-timeclock-custom-name"
 
-# SQL Server settings (server name must be globally unique)
-sql_server_name     = "sql-blazor-unique-12345"
-sql_database_name   = "blazordb"
-sql_admin_username  = "sqladmin"
-sql_admin_password  = "YourSecurePassword123!"
+# Optional: Specify custom ACR name (otherwise auto-generated)
+# acr_name = "acrtimeclockcustom"
 
-# Azure AD admin (optional, can be empty strings)
+# Optional: Specify custom backend DNS label (otherwise auto-generated)
+# backend_dns_label = "timeclock-api-custom"
+
+# SQL admin username (default: sqladmin)
+# sql_admin_username = "sqladmin"
+
+# Azure AD admin configuration (optional)
 azuread_admin_login     = ""
 azuread_admin_object_id = ""
 
-# Your IP address for SQL firewall access
-my_ip_address = "0.0.0.0"  # Replace with your actual IP
-
-# Container Registry (name must be globally unique and alphanumeric only)
-acr_name = "acrblazorunique12345"
-
-# Backend container settings
-backend_container_name = "backend-api"
-backend_image_name     = "backend-api"
-backend_image_tag      = "latest"
-
-# Static Web App
-static_web_app_name = "blazor-spa"
+# Your IP address for SQL firewall access (optional, set to 0.0.0.0 to disable)
+my_ip_address = "0.0.0.0"

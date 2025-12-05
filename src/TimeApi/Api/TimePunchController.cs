@@ -21,7 +21,7 @@ namespace TimeApi.Api
         public ActionResult GetHours(DateTime start, DateTime end)
         {
             var results = punchRepository.GetPunchRecords(start, end);
-            if (results.IsNullOrEmpty())
+            if (results == null || !results.Any())
             {
                 return Ok(Array.Empty<PunchRecord>());
             }

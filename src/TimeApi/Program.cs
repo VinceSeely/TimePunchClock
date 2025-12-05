@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using TimeApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,16 +11,52 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
-// Add CORS configuration to allow any origin
+// Add CORS configuration for frontend
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.AllowAnyOrigin()
-             .AllowAnyMethod()
-             .AllowAnyHeader();
+        policy.WithOrigins(
+            "http://localhost:5001",
+            "https://localhost:5001",
+            "http://localhost:5173",
+            builder.Configuration["Frontend:Url"] ?? ""
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
     });
 });
+
+// Add Authentication & Authorization
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Support both local IdentityServer and Azure AD
+        var authority = builder.Environment.IsDevelopment()
+            ? builder.Configuration["IdentityServer:Authority"]
+            : builder.Configuration["AzureAd:Authority"];
+
+        options.Authority = authority;
+        options.Audience = builder.Configuration["AzureAd:Audience"];
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = !builder.Environment.IsDevelopment(), // Disable for local dev
+            ValidateIssuer = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true
+        };
+
+        // For local development with IdentityServer
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false;
+        }
+    });
+
+builder.Services.AddAuthorization();
+
 builder.Services.AddScoped<ITimePunchRepository, TimePunchRepository>();
 
 //TODO add proper registration
@@ -35,9 +73,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Map controller endpoints
 app.MapControllers();

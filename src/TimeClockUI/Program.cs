@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.Authentication.WebAssembly.Msal;
+using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using MudBlazor.Services;
 using TimeClock.Client;
 using TimeClockUI;
@@ -21,12 +21,37 @@ if (string.IsNullOrEmpty(apiBaseUrl))
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Configure Azure AD MSAL authentication
-builder.Services.AddMsalAuthentication(options =>
+// Configure authentication based on AuthProvider setting
+var authProvider = builder.Configuration["AuthProvider"] ?? "Oidc";
+
+if (authProvider == "AzureAd")
 {
-    builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
-    options.ProviderOptions.DefaultAccessTokenScopes.Add(builder.Configuration["Api:Scopes:0"] ?? "");
-});
+    builder.Services.AddMsalAuthentication(options =>
+    {
+        builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
+
+        // Add the API scope
+        var apiScope = builder.Configuration["Api:Scopes:0"];
+        if (!string.IsNullOrEmpty(apiScope))
+        {
+            options.ProviderOptions.DefaultAccessTokenScopes.Add(apiScope);
+        }
+    });
+}
+else
+{
+    builder.Services.AddOidcAuthentication(options =>
+    {
+        builder.Configuration.Bind("Oidc", options.ProviderOptions);
+
+        // Add the API scope
+        var apiScope = builder.Configuration["Api:Scopes:0"];
+        if (!string.IsNullOrEmpty(apiScope))
+        {
+            options.ProviderOptions.DefaultScopes.Add(apiScope);
+        }
+    });
+}
 
 builder.Services.RegsiterTimeClient(builder.Configuration);
 builder.Services.AddMudServices();

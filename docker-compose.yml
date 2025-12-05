@@ -22,6 +22,22 @@ services:
     networks:
       - timeclock-network
 
+  identityserver:
+    image: identityserver
+    build:
+      context: ./IdentityServer/TimeClock.IdentityServer
+      dockerfile: Dockerfile
+    container_name: timeclock-identityserver
+    ports:
+      - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+    networks:
+      - timeclock-network
+    depends_on:
+      - mssql
+
   timeclockui:
     image: timeclockui
     build:
@@ -35,6 +51,7 @@ services:
       - AuthUrl=http://localhost:5000/auth
     depends_on:
       - timeapi
+      - identityserver
     networks:
       - timeclock-network
 

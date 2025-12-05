@@ -4,47 +4,125 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 2.47"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy    = true
+      recover_soft_deleted_key_vaults = true
+    }
+  }
 }
+
+provider "azuread" {
+  # Uses the same credentials as azurerm provider
+}
+
+# Get current Azure client configuration
+data "azurerm_client_config" "current" {}
 
 # Resource Group
 resource "azurerm_resource_group" "main" {
-  name     = var.resource_group_name
-  location = var.location
+  name     = local.resource_group_name
+  location = local.location
+  tags     = local.tags
+}
+
+# Azure Key Vault for secrets management
+resource "azurerm_key_vault" "kv" {
+  name                       = "kv-timeclock-${local.environment}"
+  location                   = azurerm_resource_group.main.location
+  resource_group_name        = azurerm_resource_group.main.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  sku_name                   = "standard"
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = false
+
+  enable_rbac_authorization = false
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    secret_permissions = [
+      "Get",
+      "List",
+      "Set",
+      "Delete",
+      "Purge",
+      "Recover"
+    ]
+  }
+
+  tags = local.tags
+}
+
+# Generate random password for SQL Server
+resource "random_password" "sql_admin_password" {
+  length  = 24
+  special = true
+  upper   = true
+  lower   = true
+  numeric = true
+}
+
+# Store SQL admin password in Key Vault
+resource "azurerm_key_vault_secret" "sql_password" {
+  name         = "sql-admin-password"
+  value        = random_password.sql_admin_password.result
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
+# Store SQL connection string in Key Vault
+resource "azurerm_key_vault_secret" "sql_connection_string" {
+  name         = "sql-connection-string"
+  value        = "Server=tcp:${azurerm_mssql_server.main.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.main.name};Persist Security Info=False;User ID=${var.sql_admin_username};Password=${random_password.sql_admin_password.result};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+  key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [azurerm_mssql_database.main]
 }
 
 # SQL Server
 resource "azurerm_mssql_server" "main" {
-  name                         = var.sql_server_name
+  name                         = var.sql_server_name != "" ? var.sql_server_name : local.sql_server_name
   resource_group_name          = azurerm_resource_group.main.name
   location                     = azurerm_resource_group.main.location
   version                      = "12.0"
   administrator_login          = var.sql_admin_username
-  administrator_login_password = var.sql_admin_password
+  administrator_login_password = random_password.sql_admin_password.result
   minimum_tls_version          = "1.2"
 
-  azuread_administrator {
-    login_username = var.azuread_admin_login
-    object_id      = var.azuread_admin_object_id
+  dynamic "azuread_administrator" {
+    for_each = var.azuread_admin_object_id != "" ? [1] : []
+    content {
+      login_username = var.azuread_admin_login
+      object_id      = var.azuread_admin_object_id
+    }
   }
+
+  tags = local.tags
 }
 
 # SQL Database (Free Tier)
 resource "azurerm_mssql_database" "main" {
-  name           = var.sql_database_name
+  name           = local.sql_database_name
   server_id      = azurerm_mssql_server.main.id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
   max_size_gb    = 32
   sku_name       = "Basic"
   zone_redundant = false
 
-  tags = {
-    environment = var.environment
-  }
+  tags = local.tags
 }
 
 # Firewall rule to allow Azure services
@@ -65,25 +143,27 @@ resource "azurerm_mssql_firewall_rule" "allow_my_ip" {
 
 # Container Registry (Basic tier)
 resource "azurerm_container_registry" "main" {
-  name                = var.acr_name
+  name                = var.acr_name != "" ? var.acr_name : local.acr_name
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku                 = "Basic"
   admin_enabled       = true
+
+  tags = local.tags
 }
 
 # Container Instance for Backend
 resource "azurerm_container_group" "backend" {
-  name                = var.backend_container_name
+  name                = local.backend_container_name
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   ip_address_type     = "Public"
-  dns_name_label      = var.backend_dns_label
+  dns_name_label      = var.backend_dns_label != "" ? var.backend_dns_label : local.backend_dns_label
   os_type             = "Linux"
 
   container {
     name   = "backend"
-    image  = "${azurerm_container_registry.main.login_server}/${var.backend_image_name}:${var.backend_image_tag}"
+    image  = "${azurerm_container_registry.main.login_server}/${local.backend_image_name}:${local.backend_image_tag}"
     cpu    = "0.5"
     memory = "1.0"
 
@@ -93,11 +173,11 @@ resource "azurerm_container_group" "backend" {
     }
 
     environment_variables = {
-      ASPNETCORE_ENVIRONMENT = var.environment
+      ASPNETCORE_ENVIRONMENT = local.environment
     }
 
     secure_environment_variables = {
-      ConnectionStrings__DefaultConnection = "Server=tcp:${azurerm_mssql_server.main.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.main.name};Persist Security Info=False;User ID=${var.sql_admin_username};Password=${var.sql_admin_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+      ConnectionStrings__DefaultConnection = azurerm_key_vault_secret.sql_connection_string.value
     }
   }
 
@@ -107,20 +187,16 @@ resource "azurerm_container_group" "backend" {
     password = azurerm_container_registry.main.admin_password
   }
 
-  tags = {
-    environment = var.environment
-  }
+  tags = local.tags
 }
 
 # Static Web App for Blazor SPA
 resource "azurerm_static_web_app" "blazor" {
-  name                = var.static_web_app_name
+  name                = local.static_web_app_name
   resource_group_name = azurerm_resource_group.main.name
   location            = "eastus2" # Static Web Apps have limited region availability
   sku_tier            = "Free"
   sku_size            = "Free"
 
-  tags = {
-    environment = var.environment
-  }
+  tags = local.tags
 }

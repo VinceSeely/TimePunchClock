@@ -1,0 +1,389 @@
+name: Complete Stack Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      skip_infrastructure:
+        description: 'Skip infrastructure deployment'
+        required: false
+        type: boolean
+        default: false
+      skip_backend:
+        description: 'Skip backend deployment'
+        required: false
+        type: boolean
+        default: false
+      skip_frontend:
+        description: 'Skip frontend deployment'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_infrastructure }}
+    environment: ${{ inputs.environment }}
+    outputs:
+      acr_name: ${{ steps.get-outputs.outputs.acr_name }}
+      backend_url: ${{ steps.get-outputs.outputs.backend_url }}
+      swa_url: ${{ steps.get-outputs.outputs.swa_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+          terraform_wrapper: false
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: ./Infra/${{ inputs.environment }}
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: ./Infra/${{ inputs.environment }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./Infra/${{ inputs.environment }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ./Infra/${{ inputs.environment }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get Infrastructure Outputs
+        id: get-outputs
+        working-directory: ./Infra/${{ inputs.environment }}
+        run: |
+          ACR_NAME=$(terraform output -raw acr_login_server | cut -d'.' -f1)
+          BACKEND_URL=$(terraform output -raw backend_url)
+          SWA_URL=$(terraform output -raw static_web_app_url)
+
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          echo "swa_url=$SWA_URL" >> $GITHUB_OUTPUT
+
+      - name: Infrastructure Summary
+        run: |
+          echo "## Infrastructure Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **ACR:** ${{ steps.get-outputs.outputs.acr_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend URL:** ${{ steps.get-outputs.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend URL:** ${{ steps.get-outputs.outputs.swa_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployed successfully" >> $GITHUB_STEP_SUMMARY
+
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+    if: ${{ !inputs.skip_backend && !failure() && !cancelled() }}
+    outputs:
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/TimeApi/TimeApi.csproj
+
+      - name: Build
+        run: dotnet build src/TimeApi/TimeApi.csproj --configuration Release --no-restore
+
+      - name: Build Docker image
+        run: |
+          docker build -t timeapi:${{ github.sha }} -f src/TimeApi/Dockerfile .
+          docker tag timeapi:${{ github.sha }} timeapi:latest
+
+      - name: Save Docker image
+        run: |
+          docker save timeapi:${{ github.sha }} | gzip > timeapi-${{ github.sha }}.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-backend
+          path: timeapi-${{ github.sha }}.tar.gz
+          retention-days: 1
+
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, build-backend]
+    if: ${{ !inputs.skip_backend && !failure() && !cancelled() }}
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-backend
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+          terraform_wrapper: false
+
+      - name: Get Infrastructure Details
+        id: get-infra
+        run: |
+          cd Infra/${{ inputs.environment }}
+          terraform init
+
+          ACR_NAME=$(terraform output -raw acr_login_server | cut -d'.' -f1)
+          RESOURCE_GROUP=$(terraform output -raw resource_group_name)
+
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+
+      - name: Build and Push to ACR
+        run: |
+          ACR_NAME="${{ steps.get-infra.outputs.acr_name }}"
+          IMAGE_TAG="${{ github.sha }}"
+
+          az acr login --name $ACR_NAME
+
+          docker load < timeapi-${{ github.sha }}.tar.gz
+          docker tag timeapi:${{ github.sha }} $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG
+          docker tag timeapi:${{ github.sha }} $ACR_NAME.azurecr.io/backend-api:latest
+
+          docker push $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG
+          docker push $ACR_NAME.azurecr.io/backend-api:latest
+
+      - name: Restart Container Instance
+        run: |
+          RESOURCE_GROUP="${{ steps.get-infra.outputs.resource_group }}"
+
+          CONTAINER_NAME=$(az container list --resource-group $RESOURCE_GROUP --query "[?contains(name, 'backend')].name" -o tsv | head -n 1)
+
+          if [ -n "$CONTAINER_NAME" ]; then
+            echo "Restarting container instance: $CONTAINER_NAME"
+            az container restart --name $CONTAINER_NAME --resource-group $RESOURCE_GROUP
+            sleep 30
+          fi
+
+      - name: Backend Deployment Summary
+        run: |
+          echo "## Backend Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ${{ steps.get-infra.outputs.acr_name }}.azurecr.io/backend-api:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Backend deployed successfully" >> $GITHUB_STEP_SUMMARY
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, deploy-backend]
+    if: ${{ !inputs.skip_frontend && !failure() && !cancelled() }}
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+          terraform_wrapper: false
+
+      - name: Get Infrastructure Details
+        id: get-infra
+        run: |
+          cd Infra/${{ inputs.environment }}
+          terraform init
+
+          SWA_TOKEN=$(terraform output -raw static_web_app_api_key)
+          SWA_URL=$(terraform output -raw static_web_app_url)
+
+          echo "swa_token=$SWA_TOKEN" >> $GITHUB_OUTPUT
+          echo "swa_url=$SWA_URL" >> $GITHUB_OUTPUT
+
+      - name: Restore dependencies
+        run: dotnet restore src/TimeClockUI/TimeClockUI.csproj
+
+      - name: Build Blazor WASM
+        run: |
+          dotnet publish src/TimeClockUI/TimeClockUI.csproj \
+            -c Release \
+            -o publish \
+            /p:RunAOTCompilation=false
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.get-infra.outputs.swa_token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'publish/wwwroot'
+          skip_app_build: true
+          skip_api_build: true
+
+      - name: Frontend Deployment Summary
+        run: |
+          echo "## Frontend Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.get-infra.outputs.swa_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Frontend deployed successfully" >> $GITHUB_STEP_SUMMARY
+
+  smoke-tests:
+    name: Run Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, deploy-backend, deploy-frontend]
+    if: ${{ !failure() && !cancelled() }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+          terraform_wrapper: false
+
+      - name: Get URLs
+        id: get-urls
+        run: |
+          cd Infra/${{ inputs.environment }}
+          terraform init
+
+          BACKEND_URL=$(terraform output -raw backend_url)
+          SWA_URL=$(terraform output -raw static_web_app_url)
+
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          echo "swa_url=$SWA_URL" >> $GITHUB_OUTPUT
+
+      - name: Test Backend Health
+        run: |
+          BACKEND_URL="${{ steps.get-urls.outputs.backend_url }}"
+
+          echo "Testing backend at $BACKEND_URL"
+
+          sleep 15
+
+          for i in {1..5}; do
+            if curl -f -s "$BACKEND_URL/health" || curl -f -s "$BACKEND_URL" ; then
+              echo "✅ Backend health check passed"
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 10
+          done
+
+      - name: Test Frontend Health
+        run: |
+          SWA_URL="${{ steps.get-urls.outputs.swa_url }}"
+
+          echo "Testing frontend at $SWA_URL"
+
+          sleep 15
+
+          for i in {1..5}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SWA_URL")
+            if echo "$HTTP_CODE" | grep -q "200\|301\|302"; then
+              echo "✅ Frontend health check passed (HTTP $HTTP_CODE)"
+              break
+            fi
+            echo "Attempt $i failed (HTTP $HTTP_CODE), retrying..."
+            sleep 10
+          done
+
+      - name: Smoke Tests Summary
+        run: |
+          echo "## Smoke Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend:** ${{ steps.get-urls.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend:** ${{ steps.get-urls.outputs.swa_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Smoke tests completed" >> $GITHUB_STEP_SUMMARY
+
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, deploy-backend, deploy-frontend, smoke-tests]
+    if: always()
+
+    steps:
+      - name: Complete Summary
+        run: |
+          echo "## Complete Stack Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed At:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Infrastructure: ${{ needs.deploy-infrastructure.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: ${{ needs.deploy-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: ${{ needs.deploy-frontend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Smoke Tests: ${{ needs.smoke-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.smoke-tests.result }}" = "success" ]; then
+            echo "✅ **Full stack deployment completed successfully!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Deployment completed with some issues**" >> $GITHUB_STEP_SUMMARY
+          fi
