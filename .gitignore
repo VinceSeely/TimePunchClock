@@ -10,7 +10,7 @@ project.lock.json
 .claude/
 
 # User stories
-user-stories*
+user-stories/
 
 # Visual Studio Code
 .vscode
@@ -20,6 +20,7 @@ user-stories*
 *.user
 *.userosscache
 *.sln.docstates
+scripts/
 
 # Build results
 [Dd]ebug/

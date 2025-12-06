@@ -87,7 +87,7 @@ resource "azuread_application" "blazor" {
 
     # Request the access_as_user scope
     resource_access {
-      id   = azuread_application.api.api[0].oauth2_permission_scope[0].id
+      id   = random_uuid.api_scope_id.result
       type = "Scope"
     }
   }
