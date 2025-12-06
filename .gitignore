@@ -6,6 +6,12 @@ project.lock.json
 .DS_Store
 *.pyc
 
+# Claude Code
+.claude/
+
+# User stories
+user-stories*
+
 # Visual Studio Code
 .vscode
 
