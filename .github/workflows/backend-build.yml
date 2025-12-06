@@ -21,6 +21,9 @@ jobs:
   build:
     name: Build and Test Backend
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout code
@@ -40,7 +43,8 @@ jobs:
       - name: Run tests
         run: |
           if [ -d "tests" ]; then
-            dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+            dotnet test tests/TimeApi.Tests/TimeApi.Tests.csproj --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+            dotnet test tests/TimeApi.IntegrationTests/TimeApi.IntegrationTests.csproj --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
           else
             echo "No tests found, skipping test execution"
           fi
