@@ -146,49 +146,94 @@ resource "azurerm_mssql_firewall_rule" "allow_my_ip" {
   end_ip_address   = var.my_ip_address
 }
 
-# Container Instance for Backend
-resource "azurerm_container_group" "backend" {
-  name                = local.backend_container_name
+# Container Apps Environment (required for Container Apps)
+resource "azurerm_container_app_environment" "main" {
+  name                       = "${local.backend_container_name}-env"
+  location                   = azurerm_resource_group.main.location
+  resource_group_name        = azurerm_resource_group.main.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  tags = local.tags
+}
+
+# Log Analytics Workspace for Container Apps
+resource "azurerm_log_analytics_workspace" "main" {
+  name                = "${local.backend_container_name}-logs"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  ip_address_type     = "Public"
-  dns_name_label      = var.backend_dns_label != "" ? var.backend_dns_label : local.backend_dns_label
-  os_type             = "Linux"
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
 
-  container {
-    name   = "backend"
-    image  = "${local.ghcr_registry}/${local.backend_image_name}:${local.backend_image_tag}"
-    cpu    = "0.5"
-    memory = "1.0"
+  tags = local.tags
+}
 
-    ports {
-      port     = 80
-      protocol = "TCP"
+# Container App for Backend (replaces Container Instance)
+resource "azurerm_container_app" "backend" {
+  name                         = local.backend_container_name
+  container_app_environment_id = azurerm_container_app_environment.main.id
+  resource_group_name          = azurerm_resource_group.main.name
+  revision_mode                = "Single"
+
+  template {
+    container {
+      name   = "backend"
+      image  = "${local.ghcr_registry}/${local.backend_image_name}:${local.backend_image_tag}"
+      cpu    = 0.5
+      memory = "1Gi"
+
+      env {
+        name  = "ASPNETCORE_ENVIRONMENT"
+        value = local.environment
+      }
+
+      env {
+        name  = "Authentication__Enabled"
+        value = "true"
+      }
+
+      # Add CORS allowed origins
+      dynamic "env" {
+        for_each = length(var.cors_allowed_origins) > 0 ? { for idx, origin in var.cors_allowed_origins : idx => origin } : {}
+        content {
+          name  = "Cors__AllowedOrigins__${env.key}"
+          value = env.value
+        }
+      }
+
+      # Secure environment variable for connection string
+      env {
+        name        = "ConnectionStrings__DefaultConnection"
+        secret_name = "sql-connection-string"
+      }
     }
 
-    environment_variables = merge(
-      {
-        ASPNETCORE_ENVIRONMENT  = local.environment
-        Authentication__Enabled = "true"
-      },
-      # Add CORS allowed origins as indexed environment variables
-      length(var.cors_allowed_origins) > 0 ? {
-        for idx, origin in var.cors_allowed_origins :
-        "Cors__AllowedOrigins__${idx}" => origin
-      } : {}
-    )
+    min_replicas = 1
+    max_replicas = 2
+  }
 
-    secure_environment_variables = {
-      ConnectionStrings__DefaultConnection = azurerm_key_vault_secret.sql_connection_string.value
+  # Define secret for SQL connection string
+  secret {
+    name  = "sql-connection-string"
+    value = azurerm_key_vault_secret.sql_connection_string.value
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 80
+    transport        = "auto"
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
     }
   }
 
-  # Note: GitHub Container Registry supports anonymous pulls for public images
-  # If your repository is private, you'll need to add credentials here
-  # image_registry_credential {
-  #   server   = "ghcr.io"
-  #   username = var.github_username
-  #   password = var.github_token
+  # Note: Container Apps supports registry authentication
+  # For private GitHub Container Registry, add:
+  # registry {
+  #   server               = "ghcr.io"
+  #   username             = var.github_username
+  #   password_secret_name = "registry-password"
   # }
 
   tags = local.tags

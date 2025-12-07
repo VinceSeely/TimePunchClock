@@ -197,16 +197,26 @@ jobs:
           RESOURCE_GROUP=$(terraform output -raw resource_group_name)
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
 
-      - name: Restart Container Instance
+      - name: Update Container App
         run: |
           RESOURCE_GROUP="${{ steps.get-infra.outputs.resource_group }}"
 
-          CONTAINER_NAME=$(az container list --resource-group $RESOURCE_GROUP --query "[?contains(name, 'backend')].name" -o tsv | head -n 1)
+          # Find Container App name
+          CONTAINER_APP_NAME=$(az containerapp list --resource-group $RESOURCE_GROUP --query "[?contains(name, 'backend')].name" -o tsv | head -n 1)
 
-          if [ -n "$CONTAINER_NAME" ]; then
-            echo "Restarting container instance: $CONTAINER_NAME"
-            az container restart --name $CONTAINER_NAME --resource-group $RESOURCE_GROUP
-            sleep 30
+          if [ -n "$CONTAINER_APP_NAME" ]; then
+            echo "Updating Container App: $CONTAINER_APP_NAME"
+
+            # Update the container app to deploy the new image
+            az containerapp update \
+              --name $CONTAINER_APP_NAME \
+              --resource-group $RESOURCE_GROUP \
+              --image ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/backend-api:${{ github.sha }}
+
+            echo "Container App updated successfully"
+            sleep 15
+          else
+            echo "⚠️ Container App not found. May need to be created by Terraform first."
           fi
 
       - name: Backend Deployment Summary

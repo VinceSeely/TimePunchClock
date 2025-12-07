@@ -30,18 +30,18 @@ output "sql_connection_string" {
 }
 
 output "backend_fqdn" {
-  description = "FQDN of the backend container (only if DNS label was set)"
-  value       = azurerm_container_group.backend.fqdn
-}
-
-output "backend_ip_address" {
-  description = "Public IP address of the backend container - use this to access your API"
-  value       = azurerm_container_group.backend.ip_address
+  description = "FQDN of the backend Container App"
+  value       = azurerm_container_app.backend.ingress[0].fqdn
 }
 
 output "backend_url" {
-  description = "Backend API URL - use this in your Blazor app configuration"
-  value       = azurerm_container_group.backend.fqdn != null && azurerm_container_group.backend.fqdn != "" ? "http://${azurerm_container_group.backend.fqdn}" : "http://${azurerm_container_group.backend.ip_address}"
+  description = "Backend API URL (HTTPS) - use this in your Blazor app configuration"
+  value       = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
+}
+
+output "backend_latest_revision_name" {
+  description = "Latest revision name of the Container App"
+  value       = azurerm_container_app.backend.latest_revision_name
 }
 
 output "static_web_app_url" {

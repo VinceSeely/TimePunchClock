@@ -132,26 +132,33 @@ jobs:
           # Example:
           # dotnet ef database update --project src/TimeApi/TimeApi.csproj --connection "$PROD_CONNECTION_STRING"
 
-      - name: Restart Container Instance
+      - name: Update Container App
         run: |
           RESOURCE_GROUP="${{ steps.get-infra.outputs.resource_group }}"
 
-          # Find container group in resource group
-          CONTAINER_NAME=$(az container list --resource-group $RESOURCE_GROUP --query "[?contains(name, 'backend')].name" -o tsv | head -n 1)
+          # Find Container App in resource group
+          CONTAINER_APP_NAME=$(az containerapp list --resource-group $RESOURCE_GROUP --query "[?contains(name, 'backend')].name" -o tsv | head -n 1)
 
-          if [ -n "$CONTAINER_NAME" ]; then
-            echo "Restarting container instance: $CONTAINER_NAME"
-            az container restart --name $CONTAINER_NAME --resource-group $RESOURCE_GROUP
+          if [ -n "$CONTAINER_APP_NAME" ]; then
+            echo "Updating Container App: $CONTAINER_APP_NAME"
 
-            # Wait for container to be running
-            echo "Waiting for container to be running..."
+            # Update the container app to deploy the new image
+            REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+
+            az containerapp update \
+              --name $CONTAINER_APP_NAME \
+              --resource-group $RESOURCE_GROUP \
+              --image ghcr.io/$REPO_LOWER/backend-api:$IMAGE_TAG
+
+            echo "Waiting for deployment to complete..."
             sleep 30
 
-            # Get container state
-            STATE=$(az container show --name $CONTAINER_NAME --resource-group $RESOURCE_GROUP --query "containers[0].instanceView.currentState.state" -o tsv)
-            echo "Container state: $STATE"
+            # Get revision state
+            LATEST_REVISION=$(az containerapp revision list --name $CONTAINER_APP_NAME --resource-group $RESOURCE_GROUP --query "[0].name" -o tsv)
+            echo "Latest revision: $LATEST_REVISION"
           else
-            echo "❌ Container instance not found!"
+            echo "❌ Container App not found!"
             exit 1
           fi
 

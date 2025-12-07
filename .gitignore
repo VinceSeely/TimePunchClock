@@ -21,7 +21,7 @@ user-stories/
 *.userosscache
 *.sln.docstates
 scripts/
-
+.terraform/
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
