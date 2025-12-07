@@ -35,7 +35,7 @@ locals {
     application_name = var.application_name
 
     # Cost Optimization
-    auto_shutdown = "true"  # Indicator for cost optimization policies
+    auto_shutdown = "true" # Indicator for cost optimization policies
     backup_policy = "standard"
 
     # Deployment Info

@@ -83,7 +83,7 @@ output "azuread_blazor_application_id" {
 
 output "azuread_configuration_summary" {
   description = "Azure AD Configuration Summary for easy reference"
-  value = <<-EOT
+  value       = <<-EOT
 
   Azure AD Configuration:
   ----------------------
@@ -123,12 +123,12 @@ output "finops_tags" {
 output "resource_summary" {
   description = "Summary of deployed resources for cost analysis"
   value = {
-    resource_group        = azurerm_resource_group.main.name
-    location              = azurerm_resource_group.main.location
-    sql_server_sku        = "Basic"
-    static_web_app_sku    = "Free"
-    container_cpu         = "0.5"
-    container_memory      = "1.0"
+    resource_group         = azurerm_resource_group.main.name
+    location               = azurerm_resource_group.main.location
+    sql_server_sku         = "Basic"
+    static_web_app_sku     = "Free"
+    container_cpu          = "0.5"
+    container_memory       = "1.0"
     estimated_monthly_cost = "~$5-10 USD (SQL Basic ~$5 + Container Instance ~$5)"
   }
 }

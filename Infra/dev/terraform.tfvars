@@ -26,5 +26,5 @@ cors_allowed_origins = []
 # FinOps Tags - Update these for cost tracking and governance
 cost_center      = "engineering"
 owner            = "vince@vinceseely.com"
-budget_code      = ""                     # Optional: Add your budget/project code
+budget_code      = "" # Optional: Add your budget/project code
 application_name = "timepunchclock"
