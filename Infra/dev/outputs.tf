@@ -68,12 +68,12 @@ output "azuread_api_application_id" {
 
 output "azuread_api_identifier_uri" {
   description = "Azure AD API Identifier URI"
-  value       = "api://${azuread_application.api.application_id}"
+  value       = "api://${azuread_application.api.client_id}"
 }
 
 output "azuread_api_scope" {
   description = "Azure AD API Scope"
-  value       = "api://${azuread_application.api.application_id}/access_as_user"
+  value       = "api://${azuread_application.api.client_id}/access_as_user"
 }
 
 output "azuread_blazor_application_id" {
@@ -91,8 +91,8 @@ output "azuread_configuration_summary" {
 
   API App (Backend):
     Application ID: ${azuread_application.api.client_id}
-    Identifier URI: api://${azuread_application.api.application_id}
-    Scope: api://${azuread_application.api.application_id}/access_as_user
+    Identifier URI: api://${azuread_application.api.client_id}
+    Scope: api://${azuread_application.api.client_id}/access_as_user
 
   Blazor App (Frontend):
     Application ID: ${azuread_application.blazor.client_id}

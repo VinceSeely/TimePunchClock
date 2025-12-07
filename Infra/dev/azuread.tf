@@ -20,10 +20,6 @@ resource "azuread_application" "api" {
     }
   }
 
-  # Set the identifier URI using the app's application_id (client_id)
-  # Using api://{{application_id}} format which is accepted by Azure AD policy
-  identifier_uris = ["api://${azuread_application.api.application_id}"]
-
   # Configure single-tenant authentication
   sign_in_audience = "AzureADMyOrg"
 
@@ -43,6 +39,13 @@ resource "azuread_application" "api" {
 
 # Generate a random UUID for the API scope
 resource "random_uuid" "api_scope_id" {}
+
+# Set the identifier URI for the API app
+# This must be done separately to avoid circular reference
+resource "azuread_application_identifier_uri" "api" {
+  application_id = azuread_application.api.id
+  identifier_uris = ["api://${azuread_application.api.client_id}"]
+}
 
 # Create a service principal for the API app
 resource "azuread_service_principal" "api" {
@@ -150,12 +153,12 @@ resource "azurerm_key_vault_secret" "azuread_blazor_client_id" {
 
 resource "azurerm_key_vault_secret" "azuread_api_scope" {
   name         = "azuread-api-scope"
-  value        = "api://${azuread_application.api.application_id}/access_as_user"
+  value        = "api://${azuread_application.api.client_id}/access_as_user"
   key_vault_id = azurerm_key_vault.kv.id
 }
 
 resource "azurerm_key_vault_secret" "azuread_api_identifier_uri" {
   name         = "azuread-api-identifier-uri"
-  value        = "api://${azuread_application.api.application_id}"
+  value        = "api://${azuread_application.api.client_id}"
   key_vault_id = azurerm_key_vault.kv.id
 }
