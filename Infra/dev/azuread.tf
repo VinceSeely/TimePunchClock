@@ -43,8 +43,8 @@ resource "random_uuid" "api_scope_id" {}
 # Set the identifier URI for the API app
 # This must be done separately to avoid circular reference
 resource "azuread_application_identifier_uri" "api" {
-  application_id  = azuread_application.api.id
-  identifier_uris = ["api://${azuread_application.api.client_id}"]
+  application_id = azuread_application.api.id
+  identifier_uri = "api://${azuread_application.api.client_id}"
 }
 
 # Create a service principal for the API app
