@@ -44,6 +44,12 @@ variable "cors_allowed_origins" {
   default     = []
 }
 
+variable "cloudflare_tunnel_token" {
+  description = "Cloudflare Tunnel token for HTTPS access (from GitHub Secrets)"
+  type        = string
+  sensitive   = true
+}
+
 # FinOps Tags
 variable "cost_center" {
   description = "Cost center for billing and chargeback"

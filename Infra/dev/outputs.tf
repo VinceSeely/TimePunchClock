@@ -30,18 +30,23 @@ output "sql_connection_string" {
 }
 
 output "backend_fqdn" {
-  description = "FQDN of the backend Container App"
-  value       = azurerm_container_app.backend.ingress[0].fqdn
+  description = "FQDN of the backend container (internal - for reference only)"
+  value       = azurerm_container_group.backend.fqdn
+}
+
+output "backend_ip_address" {
+  description = "Public IP address of the backend container (internal - for reference only)"
+  value       = azurerm_container_group.backend.ip_address
 }
 
 output "backend_url" {
-  description = "Backend API URL (HTTPS) - use this in your Blazor app configuration"
-  value       = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
+  description = "Backend API URL - Use your Cloudflare Tunnel URL instead (e.g., https://your-subdomain.trycloudflare.com)"
+  value       = "Configure this with your Cloudflare Tunnel public hostname"
 }
 
-output "backend_latest_revision_name" {
-  description = "Latest revision name of the Container App"
-  value       = azurerm_container_app.backend.latest_revision_name
+output "cloudflare_tunnel_note" {
+  description = "Important: Use your Cloudflare Tunnel HTTPS URL for the frontend configuration"
+  value       = "After deployment, get your HTTPS URL from the Cloudflare Zero Trust dashboard and update the frontend configuration"
 }
 
 output "static_web_app_url" {
