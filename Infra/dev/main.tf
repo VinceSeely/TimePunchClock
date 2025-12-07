@@ -122,8 +122,8 @@ resource "azurerm_mssql_database" "main" {
   sku_name       = "Basic"
   zone_redundant = false
 
-  # Cost optimization: Use local redundancy instead of geo-redundancy
-  backup_storage_redundancy = "Local"
+  # Note: Basic tier does not support configurable backup storage redundancy
+  # It automatically uses Local (LRS) redundancy which is the most cost-effective option
 
   tags = local.tags
 }
