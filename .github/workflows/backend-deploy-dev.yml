@@ -32,52 +32,46 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push to GHCR
+        run: |
+          REGISTRY="ghcr.io"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="$REGISTRY/$REPO_LOWER/backend-api"
+          IMAGE_TAG="${{ github.sha }}"
+
+          # Build image (or load from artifact if available)
+          if [ -f "timeapi-${{ github.sha }}.tar.gz" ]; then
+            echo "Loading image from artifact..."
+            docker load < timeapi-${{ github.sha }}.tar.gz
+            docker tag timeapi:${{ github.sha }} $IMAGE_NAME:$IMAGE_TAG
+            docker tag timeapi:${{ github.sha }} $IMAGE_NAME:latest
+          else
+            echo "Building image from source..."
+            docker build -t $IMAGE_NAME:$IMAGE_TAG -f src/TimeApi/Dockerfile .
+            docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+          fi
+
+          # Push to GHCR
+          docker push $IMAGE_NAME:$IMAGE_TAG
+          docker push $IMAGE_NAME:latest
+
+          echo "Pushed images:"
+          echo "- $IMAGE_NAME:$IMAGE_TAG"
+          echo "- $IMAGE_NAME:latest"
+
       - name: Azure Login
         uses: azure/login@v1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Get ACR name from Terraform
-        id: get-acr
-        run: |
-          cd Infra/dev
-
-          # Initialize Terraform to read state
-          terraform init
-
-          ACR_NAME=$(terraform output -raw acr_login_server | cut -d'.' -f1)
-          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
-          echo "ACR Name: $ACR_NAME"
-
-      - name: Build and Push to ACR
-        run: |
-          ACR_NAME="${{ steps.get-acr.outputs.acr_name }}"
-          IMAGE_TAG="${{ github.sha }}"
-
-          # Login to ACR
-          az acr login --name $ACR_NAME
-
-          # Build image (or load from artifact if available)
-          if [ -f "timeapi-${{ github.sha }}.tar.gz" ]; then
-            echo "Loading image from artifact..."
-            docker load < timeapi-${{ github.sha }}.tar.gz
-            docker tag timeapi:${{ github.sha }} $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG
-            docker tag timeapi:${{ github.sha }} $ACR_NAME.azurecr.io/backend-api:latest
-          else
-            echo "Building image from source..."
-            docker build -t $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG -f src/TimeApi/Dockerfile .
-            docker tag $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG $ACR_NAME.azurecr.io/backend-api:latest
-          fi
-
-          # Push to ACR
-          docker push $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG
-          docker push $ACR_NAME.azurecr.io/backend-api:latest
-
-          echo "Pushed images:"
-          echo "- $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG"
-          echo "- $ACR_NAME.azurecr.io/backend-api:latest"
 
       - name: Run Database Migrations
         run: |
@@ -139,11 +133,12 @@ jobs:
           cd Infra/dev
           terraform init
           BACKEND_URL=$(terraform output -raw backend_url)
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
           echo "## Backend Deployment to Dev" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** dev" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** ${{ steps.get-acr.outputs.acr_name }}.azurecr.io/backend-api:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ghcr.io/$REPO_LOWER/backend-api:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Backend URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

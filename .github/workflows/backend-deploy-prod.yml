@@ -72,12 +72,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v1
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get Infrastructure Details
         id: get-infra
@@ -85,31 +85,33 @@ jobs:
           cd Infra/prod
           terraform init
 
-          ACR_NAME=$(terraform output -raw acr_login_server | cut -d'.' -f1)
           RESOURCE_GROUP=$(terraform output -raw resource_group_name)
-
-          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
 
-      - name: Pull and Tag Image
+      - name: Pull and Tag Image for Production
         run: |
-          ACR_NAME="${{ steps.get-infra.outputs.acr_name }}"
+          REGISTRY="ghcr.io"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="$REGISTRY/$REPO_LOWER/backend-api"
           IMAGE_TAG="${{ github.event.inputs.image_tag }}"
 
-          # Login to ACR
-          az acr login --name $ACR_NAME
-
-          # Import image from dev ACR (assuming dev ACR exists)
-          # Or pull from the same ACR if image was already pushed
-          docker pull $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG
+          # Pull the specified image
+          docker pull $IMAGE_NAME:$IMAGE_TAG
 
           # Tag for production
-          docker tag $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG $ACR_NAME.azurecr.io/backend-api:prod
-          docker tag $ACR_NAME.azurecr.io/backend-api:$IMAGE_TAG $ACR_NAME.azurecr.io/backend-api:prod-${{ github.sha }}
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:prod
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:prod-${{ github.sha }}
 
           # Push production tags
-          docker push $ACR_NAME.azurecr.io/backend-api:prod
-          docker push $ACR_NAME.azurecr.io/backend-api:prod-${{ github.sha }}
+          docker push $IMAGE_NAME:prod
+          docker push $IMAGE_NAME:prod-${{ github.sha }}
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Run Database Migrations
         run: |

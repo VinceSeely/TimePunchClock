@@ -11,18 +11,36 @@ locals {
   sql_server_name        = "sql-timeclock-${local.environment}-${random_string.unique_suffix.result}"
   sql_database_name      = "timeclockdb"
   sql_admin_username     = "sqladmin"
-  acr_name               = "acrtimeclock${local.environment}${random_string.unique_suffix.result}"
   backend_container_name = "backend-api-${local.environment}"
   backend_dns_label      = "timeclock-api-${local.environment}-${random_string.unique_suffix.result}"
-  backend_image_name     = "backend-api"
-  backend_image_tag      = "latest"
   static_web_app_name    = "swa-timeclock-${local.environment}"
 
-  # Common tags
+  # GitHub Container Registry configuration
+  ghcr_registry      = "ghcr.io"
+  github_org         = "vinceseely"
+  backend_image_name = "${local.github_org}/timepunchclock/backend-api"
+  backend_image_tag  = "latest"
+
+  # Common tags with FinOps best practices
   tags = {
+    # Environment & Management
     environment = local.environment
-    project     = "timeclock"
+    project     = var.application_name
     managed_by  = "terraform"
+
+    # FinOps Tags
+    cost_center      = var.cost_center
+    owner            = var.owner != "" ? var.owner : "unassigned"
+    budget_code      = var.budget_code
+    application_name = var.application_name
+
+    # Cost Optimization
+    auto_shutdown = "true"  # Indicator for cost optimization policies
+    backup_policy = "standard"
+
+    # Deployment Info
+    deployed_by   = "github-actions"
+    last_modified = timestamp()
   }
 }
 

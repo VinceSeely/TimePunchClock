@@ -141,17 +141,6 @@ resource "azurerm_mssql_firewall_rule" "allow_my_ip" {
   end_ip_address   = var.my_ip_address
 }
 
-# Container Registry (Basic tier)
-resource "azurerm_container_registry" "main" {
-  name                = var.acr_name != "" ? var.acr_name : local.acr_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  sku                 = "Basic"
-  admin_enabled       = true
-
-  tags = local.tags
-}
-
 # Container Instance for Backend
 resource "azurerm_container_group" "backend" {
   name                = local.backend_container_name
@@ -163,7 +152,7 @@ resource "azurerm_container_group" "backend" {
 
   container {
     name   = "backend"
-    image  = "${azurerm_container_registry.main.login_server}/${local.backend_image_name}:${local.backend_image_tag}"
+    image  = "${local.ghcr_registry}/${local.backend_image_name}:${local.backend_image_tag}"
     cpu    = "0.5"
     memory = "1.0"
 
@@ -189,11 +178,13 @@ resource "azurerm_container_group" "backend" {
     }
   }
 
-  image_registry_credential {
-    server   = azurerm_container_registry.main.login_server
-    username = azurerm_container_registry.main.admin_username
-    password = azurerm_container_registry.main.admin_password
-  }
+  # Note: GitHub Container Registry supports anonymous pulls for public images
+  # If your repository is private, you'll need to add credentials here
+  # image_registry_credential {
+  #   server   = "ghcr.io"
+  #   username = var.github_username
+  #   password = var.github_token
+  # }
 
   tags = local.tags
 }

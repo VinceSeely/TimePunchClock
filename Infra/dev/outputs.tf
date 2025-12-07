@@ -29,23 +29,6 @@ output "sql_connection_string" {
   sensitive   = false
 }
 
-output "acr_login_server" {
-  description = "Login server of the Azure Container Registry"
-  value       = azurerm_container_registry.main.login_server
-}
-
-output "acr_admin_username" {
-  description = "Admin username for the Azure Container Registry"
-  value       = azurerm_container_registry.main.admin_username
-  sensitive   = true
-}
-
-output "acr_admin_password" {
-  description = "Admin password for the Azure Container Registry"
-  value       = azurerm_container_registry.main.admin_password
-  sensitive   = true
-}
-
 output "backend_fqdn" {
   description = "FQDN of the backend container (only if DNS label was set)"
   value       = azurerm_container_group.backend.fqdn
@@ -123,4 +106,29 @@ output "azuread_configuration_summary" {
 
   All configuration values are also stored in Key Vault: ${azurerm_key_vault.kv.name}
   EOT
+}
+
+# FinOps Outputs
+output "finops_tags" {
+  description = "FinOps tags applied to all resources for cost tracking"
+  value = {
+    environment      = local.environment
+    cost_center      = var.cost_center
+    owner            = var.owner
+    budget_code      = var.budget_code
+    application_name = var.application_name
+  }
+}
+
+output "resource_summary" {
+  description = "Summary of deployed resources for cost analysis"
+  value = {
+    resource_group        = azurerm_resource_group.main.name
+    location              = azurerm_resource_group.main.location
+    sql_server_sku        = "Basic"
+    static_web_app_sku    = "Free"
+    container_cpu         = "0.5"
+    container_memory      = "1.0"
+    estimated_monthly_cost = "~$5-10 USD (SQL Basic ~$5 + Container Instance ~$5)"
+  }
 }

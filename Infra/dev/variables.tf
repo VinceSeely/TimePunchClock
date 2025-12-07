@@ -32,12 +32,6 @@ variable "my_ip_address" {
   default     = "0.0.0.0"
 }
 
-variable "acr_name" {
-  description = "Name of the Azure Container Registry (must be globally unique, alphanumeric only) - optional, will be auto-generated if not provided"
-  type        = string
-  default     = ""
-}
-
 variable "backend_dns_label" {
   description = "DNS label for backend container (must be globally unique) - optional, will be auto-generated if not provided"
   type        = string
@@ -48,4 +42,29 @@ variable "cors_allowed_origins" {
   description = "List of allowed CORS origins for the backend API"
   type        = list(string)
   default     = []
+}
+
+# FinOps Tags
+variable "cost_center" {
+  description = "Cost center for billing and chargeback"
+  type        = string
+  default     = "engineering"
+}
+
+variable "owner" {
+  description = "Owner of the resources (email or team name)"
+  type        = string
+  default     = ""
+}
+
+variable "budget_code" {
+  description = "Budget code for tracking expenses"
+  type        = string
+  default     = ""
+}
+
+variable "application_name" {
+  description = "Application name for resource grouping"
+  type        = string
+  default     = "timepunchclock"
 }
