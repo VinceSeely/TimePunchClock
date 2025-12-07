@@ -22,10 +22,12 @@ provider "azurerm" {
       recover_soft_deleted_key_vaults = true
     }
   }
+  use_oidc = true
 }
 
 provider "azuread" {
-  # Uses the same credentials as azurerm provider
+  # Uses OIDC authentication for GitHub Actions
+  use_oidc = true
 }
 
 # Get current Azure client configuration
