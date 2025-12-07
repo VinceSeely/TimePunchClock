@@ -6,9 +6,9 @@ namespace TimeClockUI.Pages;
 
 public partial class MonthSummary
 {
-    [Inject] public TimePunchClient timePunchClient { get; set; }
+    [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
 
-    private List<MonthOption> Months = new()
+    private List<MonthOption> _months = new()
     {
         new(month: 1, name: "January"),
         new(month: 2, name: "February"),
@@ -24,26 +24,32 @@ public partial class MonthSummary
         new(month: 12, name: "December")
     };
 
-    private string techLeadHoursTotal = "0:00";
-    private string regularHoursTotal = "0:00";
-    private string combinedHoursTotal = "00:00";
-    private IEnumerable<PunchRecord> todaysPunchs = null!;
-    private int SelectedYear = 2025;
-    private MonthOption? SelectedMonth;
-    private DateTime StartDate;
-    private DateTime EndDate;
-    private List<int> Years = Enumerable.Range(2025, 20).ToList(); // 2025–2044
+    private string _techLeadHoursTotal = "0:00";
+    private string _regularHoursTotal = "0:00";
+    private string _combinedHoursTotal = "00:00";
+    private IEnumerable<PunchRecord> _todaysPunchs = null!;
+    private int _selectedYear = DateTime.Now.AddMonths(-1).Year;
+    private int _selectedMonth;
+    private DateTime _startDate;
+    private DateTime _endDate;
+    private List<int> _years = Enumerable.Range(2025, 20).ToList(); // 2025–2044
 
     protected override async Task OnInitializedAsync()
     {
-        // Create July date range in CST
+        // Initialize with last month
+        var lastMonth = DateTime.Now.AddMonths(-1);
+        _selectedMonth = lastMonth.Month;
+        _selectedYear = lastMonth.Year;
+
+        _startDate = new(_selectedYear, _selectedMonth, 1);
+        _endDate = _startDate.AddMonths(1).AddDays(-1);
 
         await CalculateHours();
     }
 
     private async Task CalculateHours()
     {
-        todaysPunchs = await timePunchClient.GetPunchesRange(StartDate, EndDate);
+        _todaysPunchs = await TimePunchClient.GetPunchesRange(_startDate, _endDate) ?? Enumerable.Empty<PunchRecord>();
         CalculateAndSetHours();
     }
 
@@ -55,7 +61,7 @@ public partial class MonthSummary
                     hourType,
                 hourType =>
                 {
-                    var totalMinutes = todaysPunchs
+                    var totalMinutes = _todaysPunchs
                         .Where(p => p.HourType == hourType && p.PunchOut.HasValue)
                         .Select(p => (p.PunchOut.Value - p.PunchIn).TotalMinutes)
                         .Sum();
@@ -69,38 +75,35 @@ public partial class MonthSummary
         var (techHours, techMins) = groupedHours.GetValueOrDefault(HourType.TechLead, (0, 0));
         var (regHours, regMins) = groupedHours.GetValueOrDefault(HourType.Regular, (0, 0));
 
-        techLeadHoursTotal = $"{techHours:D2}:{techMins:D2}";
-        regularHoursTotal = $"{regHours:D2}:{regMins:D2}";
+        _techLeadHoursTotal = $"{techHours:D2}:{techMins:D2}";
+        _regularHoursTotal = $"{regHours:D2}:{regMins:D2}";
 
         var combinedMinutes = techHours * 60 + techMins + regHours * 60 + regMins;
         var totalHours = combinedMinutes / 60;
         var totalMins = combinedMinutes % 60;
 
-        combinedHoursTotal = $"{totalHours:D2}:{totalMins:D2}";
+        _combinedHoursTotal = $"{totalHours:D2}:{totalMins:D2}";
     }
 
     private async Task OnYearChanged(int newYear)
     {
-        SelectedYear = newYear;
+        _selectedYear = newYear;
         await UpdateDateRange();
     }
 
-    private async Task OnMonthChanged(MonthOption newMonth)
+    private async Task OnMonthChanged(int newMonth)
     {
-        SelectedMonth = newMonth;
+        _selectedMonth = newMonth;
         await UpdateDateRange();
     }
 
     private async Task UpdateDateRange()
     {
-        if (SelectedMonth is null)
-            return;
-
         // Start of month
-        StartDate = new(SelectedYear, SelectedMonth.Month, 1);
+        _startDate = new(_selectedYear, _selectedMonth, 1);
 
         // End of month (handles leap years automatically)
-        EndDate = StartDate.AddMonths(1).AddDays(-1);
+        _endDate = _startDate.AddMonths(1).AddDays(-1);
 
         await CalculateHours();
     }

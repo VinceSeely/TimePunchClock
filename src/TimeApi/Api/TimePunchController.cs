@@ -12,16 +12,16 @@ namespace TimeApi.Api
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class TimePunchController(TimePunchRepository punchRepository) : ControllerBase
+    public class TimePunchController(ITimePunchRepository punchRepository) : ControllerBase
     {
 
 
         [HttpGet]
-        [Authorize(Policy = AuthorizationPolicies.HasAccount)]
+        [Authorize]
         public ActionResult GetHours(DateTime start, DateTime end)
         {
             var results = punchRepository.GetPunchRecords(start, end);
-            if (results.IsNullOrEmpty())
+            if (results == null || !results.Any())
             {
                 return Ok(Array.Empty<PunchRecord>());
             }
@@ -44,6 +44,11 @@ namespace TimeApi.Api
         public ActionResult GetLastPunch()
         {
             var lastPunch = punchRepository.GetLastPunch();
+
+            if (lastPunch == null)
+            {
+                return NotFound(new { message = "No punch records found" });
+            }
 
             return Ok(lastPunch);
         }

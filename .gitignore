@@ -6,6 +6,12 @@ project.lock.json
 .DS_Store
 *.pyc
 
+# Claude Code
+.claude/
+
+# User stories
+user-stories/
+
 # Visual Studio Code
 .vscode
 
@@ -14,6 +20,7 @@ project.lock.json
 *.user
 *.userosscache
 *.sln.docstates
+scripts/
 
 # Build results
 [Dd]ebug/

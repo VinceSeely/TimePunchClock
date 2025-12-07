@@ -1,4 +1,4 @@
-﻿#!/bin/sh
+#!/bin/sh
 
 # Default path for appsettings
 SETTINGS_FILE=/usr/share/nginx/html/appsettings.json
@@ -30,3 +30,6 @@ if [ -f "$SETTINGS_FILE" ]; then
 else
   echo "Warning: $SETTINGS_FILE not found!"
 fi
+
+# Start nginx in foreground
+exec nginx -g 'daemon off;'

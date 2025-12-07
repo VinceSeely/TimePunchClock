@@ -6,7 +6,7 @@ using TimeClock.Client;
 
 namespace TimeApi.Services;
 
-public class TimePunchRepository(TimeClockDbContext context)
+public class TimePunchRepository(TimeClockDbContext context) : ITimePunchRepository
 {
 
     public void InsertPunch(PunchInfo punch)
@@ -28,7 +28,8 @@ public class TimePunchRepository(TimeClockDbContext context)
             newPunch = new PunchEntity
             {
                 PunchIn = DateTime.Now,
-                HourType = punch.HourType
+                HourType = punch.HourType,
+                WorkDescription = punch.WorkDescription
             };
             context.Punchs.Add(newPunch);
         }
@@ -42,20 +43,33 @@ public class TimePunchRepository(TimeClockDbContext context)
             PunchIn = x.PunchIn,
             PunchOut = x.PunchOut.Value,
             HourType = x.HourType,
-            PuchId = x.PunchId
+            PunchId = x.PunchId,
+            AuthId = x.AuthId,
+            WorkDescription = x.WorkDescription
         });
         return query;
     }
 
-    public PunchRecord GetLastPunch()
+    public PunchRecord? GetLastPunch()
     {
-        var mostRecentPunch = context.Punchs.OrderByDescending(punch => punch.PunchIn).ThenByDescending(punch => punch.PunchOut).First();
+        var mostRecentPunch = context.Punchs
+            .OrderByDescending(punch => punch.PunchIn)
+            .ThenByDescending(punch => punch.PunchOut)
+            .FirstOrDefault();
+
+        if (mostRecentPunch == null)
+        {
+            return null;
+        }
+
         return new PunchRecord
         {
             PunchIn = mostRecentPunch.PunchIn,
             PunchOut = mostRecentPunch.PunchOut,
-            PuchId = mostRecentPunch.PunchId,
-            HourType = mostRecentPunch.HourType
+            PunchId = mostRecentPunch.PunchId,
+            HourType = mostRecentPunch.HourType,
+            AuthId = mostRecentPunch.AuthId,
+            WorkDescription = mostRecentPunch.WorkDescription
         };
     }
 }

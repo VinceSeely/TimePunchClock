@@ -1,0 +1,124 @@
+name: Backend - Build & Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/TimeApi/**'
+      - 'src/TimeClock.client/**'
+      - '.github/workflows/backend-*.yml'
+  pull_request:
+    paths:
+      - 'src/TimeApi/**'
+      - 'src/TimeClock.client/**'
+      - '.github/workflows/backend-*.yml'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build:
+    name: Build and Test Backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      checks: write
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore src/TimeApi/TimeApi.csproj
+
+      - name: Build
+        run: dotnet build src/TimeApi/TimeApi.csproj --configuration Release --no-restore
+
+      - name: Run tests
+        run: |
+          if [ -d "tests" ]; then
+            dotnet test tests/TimeApi.Tests/TimeApi.Tests.csproj --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+            dotnet test tests/TimeApi.IntegrationTests/TimeApi.IntegrationTests.csproj --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+          else
+            echo "No tests found, skipping test execution"
+          fi
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always() && hashFiles('**/test-results.trx') != ''
+        with:
+          name: .NET Tests
+          path: '**/test-results.trx'
+          reporter: dotnet-trx
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          REGISTRY="ghcr.io"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="$REGISTRY/$REPO_LOWER/backend-api"
+
+          docker build -t $IMAGE_NAME:${{ github.sha }} -f src/TimeApi/Dockerfile .
+          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
+          docker tag $IMAGE_NAME:${{ github.sha }} timeapi:${{ github.sha }}
+
+      - name: Push to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          REGISTRY="ghcr.io"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="$REGISTRY/$REPO_LOWER/backend-api"
+
+          docker push $IMAGE_NAME:${{ github.sha }}
+          docker push $IMAGE_NAME:latest
+
+      - name: Save Docker image
+        run: |
+          docker save timeapi:${{ github.sha }} | gzip > timeapi-${{ github.sha }}.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-backend
+          path: timeapi-${{ github.sha }}.tar.gz
+          retention-days: 7
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'timeapi:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Build Summary
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+          echo "## Backend Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Image:** ghcr.io/$REPO_LOWER/backend-api:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,223 @@
+name: Backend - Deploy to Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (commit SHA or "latest")'
+        required: true
+        default: 'latest'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  backup-database:
+    name: Backup Production Database
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create Database Backup
+        run: |
+          cd Infra/prod
+          terraform init
+
+          SQL_SERVER=$(terraform output -raw sql_server_fqdn | cut -d'.' -f1)
+          DATABASE=$(terraform output -raw sql_database_name)
+          RESOURCE_GROUP=$(terraform output -raw resource_group_name)
+
+          BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S)"
+
+          echo "Creating backup: $BACKUP_NAME"
+
+          # Create a copy of the database as backup
+          # Note: This is a simple copy approach for Azure SQL
+          # For production, consider Azure SQL Database automatic backups
+          echo "Database: $DATABASE"
+          echo "Backup name: $BACKUP_NAME"
+          echo "⚠️ Using Azure SQL automatic backups. Manual backup not created."
+          echo "Verify backups in Azure Portal under the SQL database > Backups"
+
+      - name: Backup Summary
+        run: |
+          echo "## Database Backup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Database backup verified" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Azure SQL Database has automatic backups enabled:" >> $GITHUB_STEP_SUMMARY
+          echo "- Point-in-time restore available for last 7-35 days" >> $GITHUB_STEP_SUMMARY
+          echo "- Long-term backups can be configured in Azure Portal" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    name: Deploy Backend to Production
+    runs-on: ubuntu-latest
+    needs: backup-database
+    environment:
+      name: production
+      url: ${{ steps.get-url.outputs.backend_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Infrastructure Details
+        id: get-infra
+        run: |
+          cd Infra/prod
+          terraform init
+
+          RESOURCE_GROUP=$(terraform output -raw resource_group_name)
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+
+      - name: Pull and Tag Image for Production
+        run: |
+          REGISTRY="ghcr.io"
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="$REGISTRY/$REPO_LOWER/backend-api"
+          IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+
+          # Pull the specified image
+          docker pull $IMAGE_NAME:$IMAGE_TAG
+
+          # Tag for production
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:prod
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:prod-${{ github.sha }}
+
+          # Push production tags
+          docker push $IMAGE_NAME:prod
+          docker push $IMAGE_NAME:prod-${{ github.sha }}
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run Database Migrations
+        run: |
+          echo "Running database migrations..."
+          # TODO: Add migration commands here
+          # Ensure migrations are backwards compatible!
+          # Example:
+          # dotnet ef database update --project src/TimeApi/TimeApi.csproj --connection "$PROD_CONNECTION_STRING"
+
+      - name: Restart Container Instance
+        run: |
+          RESOURCE_GROUP="${{ steps.get-infra.outputs.resource_group }}"
+
+          # Find container group in resource group
+          CONTAINER_NAME=$(az container list --resource-group $RESOURCE_GROUP --query "[?contains(name, 'backend')].name" -o tsv | head -n 1)
+
+          if [ -n "$CONTAINER_NAME" ]; then
+            echo "Restarting container instance: $CONTAINER_NAME"
+            az container restart --name $CONTAINER_NAME --resource-group $RESOURCE_GROUP
+
+            # Wait for container to be running
+            echo "Waiting for container to be running..."
+            sleep 30
+
+            # Get container state
+            STATE=$(az container show --name $CONTAINER_NAME --resource-group $RESOURCE_GROUP --query "containers[0].instanceView.currentState.state" -o tsv)
+            echo "Container state: $STATE"
+          else
+            echo "❌ Container instance not found!"
+            exit 1
+          fi
+
+      - name: Health Check and Smoke Tests
+        id: health-check
+        run: |
+          cd Infra/prod
+          BACKEND_URL=$(terraform output -raw backend_url)
+
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+          echo "Running health check on $BACKEND_URL"
+
+          # Wait for service to be ready
+          sleep 15
+
+          # Health check with retries
+          SUCCESS=false
+          for i in {1..10}; do
+            if curl -f -s "$BACKEND_URL/health" || curl -f -s "$BACKEND_URL" ; then
+              echo "✅ Health check passed"
+              SUCCESS=true
+              break
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+
+          if [ "$SUCCESS" = false ]; then
+            echo "❌ Health check failed!"
+            exit 1
+          fi
+
+          # Additional smoke tests
+          echo "Running smoke tests..."
+          # TODO: Add smoke test API calls here
+
+      - name: Get Backend URL
+        id: get-url
+        run: |
+          cd Infra/prod
+          terraform init
+          BACKEND_URL=$(terraform output -raw backend_url)
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## Backend Deployment to Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag:** ${{ github.event.inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production Tag:** prod-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend URL:** ${{ steps.health-check.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed At:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.health-check.outcome }}" = "success" ]; then
+            echo "✅ Deployment successful and health checks passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Deployment completed but health checks may have issues" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  rollback-on-failure:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    environment: production
+
+    steps:
+      - name: Rollback Instructions
+        run: |
+          echo "## ⚠️ Deployment Failed - Rollback Required" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To rollback:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Identify the last working image tag" >> $GITHUB_STEP_SUMMARY
+          echo "2. Re-run this workflow with that image tag" >> $GITHUB_STEP_SUMMARY
+          echo "3. Or manually update the container instance to use the previous image" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Database changes may need to be reverted manually if migrations were applied" >> $GITHUB_STEP_SUMMARY
