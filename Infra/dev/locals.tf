@@ -4,7 +4,7 @@
 locals {
   # Environment configuration
   environment = "dev"
-  location    = "eastus2"  # Changed from eastus due to SQL provisioning restrictions
+  location    = "eastus2" # Changed from eastus due to SQL provisioning restrictions
 
   # Naming convention: resource-type-app-environment
   resource_group_name    = "rg-timeclock-${local.environment}"
