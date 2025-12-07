@@ -117,11 +117,21 @@ resource "azuread_service_principal" "blazor" {
 }
 
 # Grant admin consent for the Blazor app to access the API
-# Note: This requires the service principal running Terraform to have permissions to grant consent
+# Note: This may fail if the service principal doesn't have consent permissions
+# If it fails, you can grant consent manually in Azure Portal
 resource "azuread_service_principal_delegated_permission_grant" "blazor_to_api" {
   service_principal_object_id          = azuread_service_principal.blazor.object_id
   resource_service_principal_object_id = azuread_service_principal.api.object_id
   claim_values                         = ["access_as_user"]
+
+  depends_on = [
+    azuread_service_principal.api,
+    azuread_service_principal.blazor
+  ]
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # Store Azure AD configuration in Key Vault

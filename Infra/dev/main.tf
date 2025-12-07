@@ -115,12 +115,12 @@ resource "azurerm_mssql_server" "main" {
   tags = local.tags
 }
 
-# SQL Database (Free Tier)
+# SQL Database (Basic Tier)
 resource "azurerm_mssql_database" "main" {
   name           = local.sql_database_name
   server_id      = azurerm_mssql_server.main.id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
-  max_size_gb    = 32
+  max_size_gb    = 2 # Basic tier supports up to 2GB
   sku_name       = "Basic"
   zone_redundant = false
 
