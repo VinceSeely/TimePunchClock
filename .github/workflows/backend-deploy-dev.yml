@@ -82,9 +82,15 @@ jobs:
           # dotnet ef database update --project src/TimeApi/TimeApi.csproj --connection "$CONNECTION_STRING"
 
       - name: Restart Container Instance
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           # Get container group name from Terraform
           cd Infra/dev
+          terraform init
           CONTAINER_GROUP=$(terraform output -raw resource_group_name)
           RESOURCE_GROUP=$(terraform output -raw resource_group_name)
 
@@ -107,8 +113,14 @@ jobs:
           fi
 
       - name: Health Check
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           cd Infra/dev
+          terraform init
           BACKEND_URL=$(terraform output -raw backend_url)
 
           echo "Running health check on $BACKEND_URL"
@@ -130,6 +142,11 @@ jobs:
 
       - name: Deployment Summary
         if: always()
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           cd Infra/dev
           terraform init
