@@ -40,6 +40,11 @@ jobs:
 
       - name: Get Infrastructure Details
         id: get-infra
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           cd Infra/dev
           terraform init
@@ -47,24 +52,32 @@ jobs:
           BACKEND_URL=$(terraform output -raw backend_url)
           SWA_NAME=$(terraform output -raw static_web_app_url | sed 's|https://||' | cut -d'.' -f1)
           SWA_TOKEN=$(terraform output -raw static_web_app_api_key)
+          TENANT_ID=$(terraform output -raw azuread_tenant_id)
+          BLAZOR_CLIENT_ID=$(terraform output -raw azuread_blazor_application_id)
+          API_CLIENT_ID=$(terraform output -raw azuread_api_application_id)
 
           echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
           echo "swa_name=$SWA_NAME" >> $GITHUB_OUTPUT
           echo "swa_token=$SWA_TOKEN" >> $GITHUB_OUTPUT
+          echo "tenant_id=$TENANT_ID" >> $GITHUB_OUTPUT
+          echo "blazor_client_id=$BLAZOR_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "api_client_id=$API_CLIENT_ID" >> $GITHUB_OUTPUT
           echo "Backend URL: $BACKEND_URL"
 
-      - name: Update Configuration
+      - name: Configure Blazor App Settings
         run: |
-          BACKEND_URL="${{ steps.get-infra.outputs.backend_url }}"
+          CONFIG_FILE="src/TimeClockUI/wwwroot/appsettings.Production.json"
 
-          # Update appsettings for dev environment
-          if [ -f "src/TimeClockUI/wwwroot/appsettings.Development.json" ]; then
-            echo "Updating appsettings.Development.json with backend URL"
-            # Use jq to update the JSON file if needed
-            # For now, we'll assume the config is already set or uses environment variables
-          fi
+          echo "Updating $CONFIG_FILE with deployment values..."
 
-          echo "Configuration updated for dev environment"
+          # Replace placeholders with actual values
+          sed -i "s|BACKEND_URL_PLACEHOLDER|${{ steps.get-infra.outputs.backend_url }}|g" $CONFIG_FILE
+          sed -i "s|TENANT_ID_PLACEHOLDER|${{ steps.get-infra.outputs.tenant_id }}|g" $CONFIG_FILE
+          sed -i "s|BLAZOR_CLIENT_ID_PLACEHOLDER|${{ steps.get-infra.outputs.blazor_client_id }}|g" $CONFIG_FILE
+          sed -i "s|API_CLIENT_ID_PLACEHOLDER|${{ steps.get-infra.outputs.api_client_id }}|g" $CONFIG_FILE
+
+          echo "Configuration updated:"
+          cat $CONFIG_FILE
 
       - name: Restore dependencies
         run: dotnet restore src/TimeClockUI/TimeClockUI.csproj

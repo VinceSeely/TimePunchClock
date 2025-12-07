@@ -41,7 +41,7 @@ output "backend_ip_address" {
 
 output "backend_url" {
   description = "Backend API URL - use this in your Blazor app configuration"
-  value       = "http://${azurerm_container_group.backend.ip_address}"
+  value       = azurerm_container_group.backend.fqdn != null && azurerm_container_group.backend.fqdn != "" ? "http://${azurerm_container_group.backend.fqdn}" : "http://${azurerm_container_group.backend.ip_address}"
 }
 
 output "static_web_app_url" {
