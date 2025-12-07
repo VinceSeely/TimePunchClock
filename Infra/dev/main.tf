@@ -166,7 +166,7 @@ resource "azurerm_container_group" "backend" {
 
     environment_variables = merge(
       {
-        ASPNETCORE_ENVIRONMENT = local.environment
+        ASPNETCORE_ENVIRONMENT  = local.environment
         Authentication__Enabled = "true"
       },
       # Add CORS allowed origins as indexed environment variables
