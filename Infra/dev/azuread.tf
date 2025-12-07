@@ -40,13 +40,6 @@ resource "azuread_application" "api" {
 # Generate a random UUID for the API scope
 resource "random_uuid" "api_scope_id" {}
 
-# Set the identifier URI for the API app
-# This must be done separately to avoid circular reference
-resource "azuread_application_identifier_uri" "api" {
-  application_id = azuread_application.api.id
-  identifier_uri = "api://${azuread_application.api.client_id}"
-}
-
 # Create a service principal for the API app
 resource "azuread_service_principal" "api" {
   client_id                    = azuread_application.api.client_id
@@ -71,7 +64,6 @@ resource "azuread_application" "blazor" {
   single_page_application {
     redirect_uris = [
       "http://localhost:5000/authentication/login-callback",
-      "${azurerm_static_web_app.blazor.default_host_name}/authentication/login-callback",
       "https://${azurerm_static_web_app.blazor.default_host_name}/authentication/login-callback"
     ]
   }
