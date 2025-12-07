@@ -122,6 +122,9 @@ resource "azurerm_mssql_database" "main" {
   sku_name       = "Basic"
   zone_redundant = false
 
+  # Cost optimization: Use local redundancy instead of geo-redundancy
+  backup_storage_redundancy = "Local"
+
   tags = local.tags
 }
 
