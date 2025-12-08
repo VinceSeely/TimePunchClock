@@ -1,6 +1,8 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using System.Security.Claims;
 using TimeApi.Api;
 using TimeApi.Services;
 using TimeClock.Client;
@@ -12,12 +14,26 @@ public class TimePunchControllerTests
 {
     private Mock<ITimePunchRepository> _mockRepository = null!;
     private TimePunchController _controller = null!;
+    private const string TestAuthId = "test-user-123";
 
     [SetUp]
     public void Setup()
     {
         _mockRepository = new Mock<ITimePunchRepository>(MockBehavior.Strict);
         _controller = new TimePunchController(_mockRepository.Object);
+
+        // Setup mock user with claims
+        var claims = new List<Claim>
+        {
+            new Claim("oid", TestAuthId)
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = claimsPrincipal }
+        };
     }
 
     [TearDown]
@@ -53,7 +69,7 @@ public class TimePunchControllerTests
         };
 
         _mockRepository
-            .Setup(r => r.GetPunchRecords(start, end))
+            .Setup(r => r.GetPunchRecords(start, end, TestAuthId))
             .Returns(expectedRecords);
 
         // Act
@@ -73,7 +89,7 @@ public class TimePunchControllerTests
         var end = DateTime.Today;
 
         _mockRepository
-            .Setup(r => r.GetPunchRecords(start, end))
+            .Setup(r => r.GetPunchRecords(start, end, TestAuthId))
             .Returns(new List<PunchRecord>());
 
         // Act
@@ -93,7 +109,7 @@ public class TimePunchControllerTests
         var end = DateTime.Today;
 
         _mockRepository
-            .Setup(r => r.GetPunchRecords(start, end))
+            .Setup(r => r.GetPunchRecords(start, end, TestAuthId))
             .Returns((IEnumerable<PunchRecord>)null!);
 
         // Act
@@ -113,7 +129,7 @@ public class TimePunchControllerTests
         var end = new DateTime(2024, 1, 31);
 
         _mockRepository
-            .Setup(r => r.GetPunchRecords(start, end))
+            .Setup(r => r.GetPunchRecords(start, end, TestAuthId))
             .Returns(new List<PunchRecord>());
 
         // Act
@@ -145,11 +161,11 @@ public class TimePunchControllerTests
         };
 
         _mockRepository
-            .Setup(r => r.InsertPunch(punchInfo))
+            .Setup(r => r.InsertPunch(punchInfo, TestAuthId))
             .Verifiable();
 
         _mockRepository
-            .Setup(r => r.GetLastPunch())
+            .Setup(r => r.GetLastPunch(TestAuthId))
             .Returns(expectedLastPunch);
 
         // Act
@@ -175,12 +191,12 @@ public class TimePunchControllerTests
 
         _mockRepository
             .InSequence(sequence)
-            .Setup(r => r.InsertPunch(punchInfo))
+            .Setup(r => r.InsertPunch(punchInfo, TestAuthId))
             .Verifiable();
 
         _mockRepository
             .InSequence(sequence)
-            .Setup(r => r.GetLastPunch())
+            .Setup(r => r.GetLastPunch(TestAuthId))
             .Returns(new PunchRecord
             {
                 PunchId = Guid.NewGuid(),
@@ -213,8 +229,8 @@ public class TimePunchControllerTests
             HourType = HourType.Regular
         };
 
-        _mockRepository.Setup(r => r.InsertPunch(punchInfo)).Verifiable();
-        _mockRepository.Setup(r => r.GetLastPunch()).Returns(expectedRecord);
+        _mockRepository.Setup(r => r.InsertPunch(punchInfo, TestAuthId)).Verifiable();
+        _mockRepository.Setup(r => r.GetLastPunch(TestAuthId)).Returns(expectedRecord);
 
         // Act
         var result = _controller.PunchHours(punchInfo);
@@ -244,8 +260,8 @@ public class TimePunchControllerTests
             HourType = HourType.TechLead
         };
 
-        _mockRepository.Setup(r => r.InsertPunch(punchInfo)).Verifiable();
-        _mockRepository.Setup(r => r.GetLastPunch()).Returns(expectedRecord);
+        _mockRepository.Setup(r => r.InsertPunch(punchInfo, TestAuthId)).Verifiable();
+        _mockRepository.Setup(r => r.GetLastPunch(TestAuthId)).Returns(expectedRecord);
 
         // Act
         var result = _controller.PunchHours(punchInfo);
@@ -274,7 +290,7 @@ public class TimePunchControllerTests
         };
 
         _mockRepository
-            .Setup(r => r.GetLastPunch())
+            .Setup(r => r.GetLastPunch(TestAuthId))
             .Returns(expectedRecord);
 
         // Act
@@ -291,7 +307,7 @@ public class TimePunchControllerTests
     {
         // Arrange
         _mockRepository
-            .Setup(r => r.GetLastPunch())
+            .Setup(r => r.GetLastPunch(TestAuthId))
             .Returns((PunchRecord?)null);
 
         // Act
@@ -316,7 +332,7 @@ public class TimePunchControllerTests
         };
 
         _mockRepository
-            .Setup(r => r.GetLastPunch())
+            .Setup(r => r.GetLastPunch(TestAuthId))
             .Returns(openPunch);
 
         // Act
@@ -341,7 +357,7 @@ public class TimePunchControllerTests
         };
 
         _mockRepository
-            .Setup(r => r.GetLastPunch())
+            .Setup(r => r.GetLastPunch(TestAuthId))
             .Returns(closedPunch);
 
         // Act
