@@ -11,6 +11,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
+// Add HttpClient for diagnostics and external API calls
+builder.Services.AddHttpClient();
+
 // Add CORS configuration for frontend
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins")
     .Get<string[]>() ?? Array.Empty<string>();
@@ -40,10 +43,13 @@ if (authEnabled)
             // Otherwise use Azure AD authority (even in Development environment)
             var identityServerAuthority = builder.Configuration["IdentityServer:Authority"];
             var azureAdAuthority = builder.Configuration["AzureAd:Authority"];
+            var tenantId = builder.Configuration["AzureAd:TenantId"];
 
-            var authority = !string.IsNullOrEmpty(identityServerAuthority) && builder.Environment.IsDevelopment()
-                ? identityServerAuthority
-                : azureAdAuthority;
+            var isUsingIdentityServer = !string.IsNullOrEmpty(identityServerAuthority) &&
+                                       builder.Environment.IsDevelopment() &&
+                                       builder.Configuration.GetValue<bool>("Authentication:UseIdentityServer", false);
+
+            var authority = isUsingIdentityServer ? identityServerAuthority : azureAdAuthority;
 
             if (string.IsNullOrEmpty(authority))
             {
@@ -53,13 +59,31 @@ if (authEnabled)
 
             options.Authority = authority;
 
+            // CRITICAL FIX: Explicitly set MetadataAddress for Azure AD
+            // This ensures the middleware can retrieve signing keys even in containerized environments
+            // The auto-discovery can fail in Azure Container Apps due to DNS or connectivity issues
+            if (!isUsingIdentityServer && !string.IsNullOrEmpty(tenantId))
+            {
+                options.MetadataAddress = $"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration";
+
+                // Increase timeout for metadata retrieval in containerized environments
+                options.BackchannelTimeout = TimeSpan.FromSeconds(30);
+
+                // Force HTTPS for Azure AD metadata (security best practice)
+                options.RequireHttpsMetadata = true;
+            }
+            else if (isUsingIdentityServer)
+            {
+                // For local IdentityServer development only
+                options.RequireHttpsMetadata = false;
+            }
+
             // Azure AD tokens can have audience as either:
             // 1. The client ID (GUID) - most common with delegated scopes
             // 2. The API identifier URI (api://guid) - less common
             // We need to accept both formats
             var audience = builder.Configuration["AzureAd:Audience"];
             var clientId = builder.Configuration["AzureAd:ClientId"];
-            var tenantId = builder.Configuration["AzureAd:TenantId"];
 
             options.TokenValidationParameters = new TokenValidationParameters
             {
@@ -80,30 +104,42 @@ if (authEnabled)
                 }.Where(i => !string.IsNullOrEmpty(tenantId))
             };
 
-            // For local development with IdentityServer
-            if (builder.Environment.IsDevelopment())
-            {
-                options.RequireHttpsMetadata = false;
-            }
-
             // Enable detailed authentication logging in non-production environments
             if (!builder.Environment.IsProduction())
             {
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        if (context.Request.Headers.TryGetValue("Authorization", out var authHeader))
+                        {
+                            Console.WriteLine($"[AUTH] Received authorization header (length: {authHeader.ToString().Length})");
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnAuthenticationFailed = context =>
                     {
-                        Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                        Console.WriteLine($"[AUTH ERROR] Authentication failed: {context.Exception.GetType().Name}");
+                        Console.WriteLine($"[AUTH ERROR] Message: {context.Exception.Message}");
+                        if (context.Exception.InnerException != null)
+                        {
+                            Console.WriteLine($"[AUTH ERROR] Inner: {context.Exception.InnerException.Message}");
+                        }
                         return Task.CompletedTask;
                     },
                     OnTokenValidated = context =>
                     {
-                        Console.WriteLine($"Token validated for: {context.Principal?.Identity?.Name}");
+                        var name = context.Principal?.Identity?.Name ?? "Unknown";
+                        var claims = context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}").ToList() ?? new List<string>();
+                        Console.WriteLine($"[AUTH SUCCESS] Token validated for: {name}");
+                        Console.WriteLine($"[AUTH SUCCESS] Claims count: {claims.Count}");
                         return Task.CompletedTask;
                     },
                     OnChallenge = context =>
                     {
-                        Console.WriteLine($"Authentication challenge: {context.Error}, {context.ErrorDescription}");
+                        Console.WriteLine($"[AUTH CHALLENGE] Error: {context.Error}");
+                        Console.WriteLine($"[AUTH CHALLENGE] Description: {context.ErrorDescription}");
+                        Console.WriteLine($"[AUTH CHALLENGE] URI: {context.ErrorUri}");
                         return Task.CompletedTask;
                     }
                 };
