@@ -54,7 +54,7 @@ jobs:
           cd Infra/dev
           terraform init
 
-          BACKEND_URL=$(terraform output -raw backend_url)
+          BACKEND_URL=$(terraform output -raw backend_container_app_url)
           SWA_NAME=$(terraform output -raw static_web_app_url | sed 's|https://||' | cut -d'.' -f1)
           SWA_TOKEN=$(terraform output -raw static_web_app_api_key)
           TENANT_ID=$(terraform output -raw azuread_tenant_id)
@@ -137,7 +137,7 @@ jobs:
           cd Infra/dev
           terraform init
           SWA_URL=$(terraform output -raw static_web_app_url)
-          BACKEND_URL=$(terraform output -raw backend_url)
+          BACKEND_URL=$(terraform output -raw backend_container_app_url)
 
           echo "## Frontend Deployment to Dev" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

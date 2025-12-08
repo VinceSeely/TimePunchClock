@@ -50,7 +50,7 @@ jobs:
           cd Infra/prod
           terraform init
 
-          BACKEND_URL=$(terraform output -raw backend_url)
+          BACKEND_URL=$(terraform output -raw backend_container_app_url)
           SWA_NAME=$(terraform output -raw static_web_app_url | sed 's|https://||' | cut -d'.' -f1)
           SWA_TOKEN=$(terraform output -raw static_web_app_api_key)
           SWA_URL=$(terraform output -raw static_web_app_url)
