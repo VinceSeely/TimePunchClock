@@ -47,8 +47,8 @@ resource "azurerm_key_vault" "kv" {
   resource_group_name        = azurerm_resource_group.main.name
   tenant_id                  = data.azurerm_client_config.current.tenant_id
   sku_name                   = "standard"
-  soft_delete_retention_days = 7
-  purge_protection_enabled   = false
+  soft_delete_retention_days = 90
+  purge_protection_enabled   = true
 
   enable_rbac_authorization = false
 
@@ -146,70 +146,14 @@ resource "azurerm_mssql_firewall_rule" "allow_my_ip" {
   end_ip_address   = var.my_ip_address
 }
 
-# Container Instance for Backend with Cloudflare Tunnel
-resource "azurerm_container_group" "backend" {
-  name                = local.backend_container_name
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  ip_address_type     = "Public"
-  dns_name_label      = var.backend_dns_label != "" ? var.backend_dns_label : local.backend_dns_label
-  os_type             = "Linux"
-
-  # Backend API Container
-  container {
-    name   = "backend"
-    image  = "${local.ghcr_registry}/${local.backend_image_name}:${local.backend_image_tag}"
-    cpu    = "0.5"
-    memory = "1.0"
-
-    ports {
-      port     = 80
-      protocol = "TCP"
-    }
-
-    environment_variables = merge(
-      {
-        ASPNETCORE_ENVIRONMENT  = local.environment
-        Authentication__Enabled = "true"
-      },
-      # Add CORS allowed origins as indexed environment variables
-      length(var.cors_allowed_origins) > 0 ? {
-        for idx, origin in var.cors_allowed_origins :
-        "Cors__AllowedOrigins__${idx}" => origin
-      } : {}
-    )
-
-    secure_environment_variables = {
-      ConnectionStrings__DefaultConnection = azurerm_key_vault_secret.sql_connection_string.value
-    }
-  }
-
-  # Cloudflare Tunnel Sidecar Container
-  container {
-    name   = "cloudflared"
-    image  = "cloudflare/cloudflared:latest"
-    cpu    = "0.25"
-    memory = "0.5"
-
-    commands = [
-      "tunnel",
-      "--no-autoupdate",
-      "run",
-      "--token",
-      var.cloudflare_tunnel_token
-    ]
-  }
-
-  # Note: GitHub Container Registry supports anonymous pulls for public images
-  # If your repository is private, you'll need to add credentials here
-  # image_registry_credential {
-  #   server   = "ghcr.io"
-  #   username = var.github_username
-  #   password = var.github_token
-  # }
-
-  tags = local.tags
-}
+# Container Instance has been replaced with Azure Container Apps
+# See container-apps.tf for the new implementation
+# Benefits:
+# - Lower cost ($6-9/month vs $18-23/month)
+# - Scale to zero capability
+# - Built-in HTTPS (no Cloudflare sidecar needed)
+# - Better auto-scaling
+# - Native Azure integration
 
 # Static Web App for Blazor SPA
 resource "azurerm_static_web_app" "blazor" {

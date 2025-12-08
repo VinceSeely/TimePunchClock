@@ -170,8 +170,9 @@ jobs:
           echo "- FQDN: $(terraform output -raw sql_server_fqdn)" >> $GITHUB_STEP_SUMMARY
           echo "- Database: $(terraform output -raw sql_database_name)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Backend API" >> $GITHUB_STEP_SUMMARY
-          echo "- URL: $(terraform output -raw backend_url)" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend API (Container App)" >> $GITHUB_STEP_SUMMARY
+          echo "- URL: $(terraform output -raw backend_container_app_url)" >> $GITHUB_STEP_SUMMARY
+          echo "- FQDN: $(terraform output -raw backend_container_app_fqdn)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Static Web App" >> $GITHUB_STEP_SUMMARY
           echo "- URL: $(terraform output -raw static_web_app_url)" >> $GITHUB_STEP_SUMMARY

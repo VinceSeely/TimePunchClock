@@ -29,24 +29,33 @@ output "sql_connection_string" {
   sensitive   = false
 }
 
-output "backend_fqdn" {
-  description = "FQDN of the backend container (internal - for reference only)"
-  value       = azurerm_container_group.backend.fqdn
+output "backend_container_app_url" {
+  description = "Backend Container App URL (HTTPS enabled by default)"
+  value       = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
 }
 
-output "backend_ip_address" {
-  description = "Public IP address of the backend container (internal - for reference only)"
-  value       = azurerm_container_group.backend.ip_address
+output "backend_container_app_fqdn" {
+  description = "Backend Container App FQDN"
+  value       = azurerm_container_app.backend.ingress[0].fqdn
 }
 
-output "backend_url" {
-  description = "Backend API URL - Use your Cloudflare Tunnel URL instead (e.g., https://your-subdomain.trycloudflare.com)"
-  value       = "Configure this with your Cloudflare Tunnel public hostname"
-}
+output "backend_url_configuration" {
+  description = "Backend API URL configuration instructions"
+  value       = <<-EOT
 
-output "cloudflare_tunnel_note" {
-  description = "Important: Use your Cloudflare Tunnel HTTPS URL for the frontend configuration"
-  value       = "After deployment, get your HTTPS URL from the Cloudflare Zero Trust dashboard and update the frontend configuration"
+  Backend API Configuration:
+  -------------------------
+  Container App URL: https://${azurerm_container_app.backend.ingress[0].fqdn}
+
+  HTTPS: Automatically enabled with Azure-managed SSL certificate
+
+  To use a custom domain:
+  1. Add custom_domain block to container-apps.tf
+  2. Configure DNS CNAME record pointing to: ${azurerm_container_app.backend.ingress[0].fqdn}
+  3. Update frontend configuration with your custom domain
+
+  No Cloudflare Tunnel needed - Container Apps provides native HTTPS!
+  EOT
 }
 
 output "static_web_app_url" {
@@ -128,12 +137,14 @@ output "finops_tags" {
 output "resource_summary" {
   description = "Summary of deployed resources for cost analysis"
   value = {
-    resource_group         = azurerm_resource_group.main.name
-    location               = azurerm_resource_group.main.location
-    sql_server_sku         = "Basic"
-    static_web_app_sku     = "Free"
-    container_cpu          = "0.5"
-    container_memory       = "1.0"
-    estimated_monthly_cost = "~$5-10 USD (SQL Basic ~$5 + Container Instance ~$5)"
+    resource_group           = azurerm_resource_group.main.name
+    location                 = azurerm_resource_group.main.location
+    sql_server_sku           = "Basic"
+    static_web_app_sku       = "Free"
+    container_app_cpu        = "0.5"
+    container_app_memory     = "1Gi"
+    container_app_min_replicas = "0 (scale to zero)"
+    container_app_max_replicas = "3"
+    estimated_monthly_cost   = "~$6-9 USD (SQL Basic ~$5 + Container Apps ~$1-4 + Key Vault ~$0.50 + Log Analytics ~$0.50)"
   }
 }

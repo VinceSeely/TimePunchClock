@@ -28,6 +28,8 @@ scripts/
 [Rr]elease/
 [Rr]eleases/
 x64/
+MIGRATION_SUMMARY.md
+CONTAINER_APPS_MIGRATION.md
 x86/
 build/
 bld/
