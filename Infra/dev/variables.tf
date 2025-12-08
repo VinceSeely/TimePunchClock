@@ -32,23 +32,17 @@ variable "my_ip_address" {
   default     = "0.0.0.0"
 }
 
-variable "backend_dns_label" {
-  description = "DNS label for backend container (must be globally unique) - optional, will be auto-generated if not provided"
-  type        = string
-  default     = ""
-}
-
 variable "cors_allowed_origins" {
   description = "List of allowed CORS origins for the backend API"
   type        = list(string)
   default     = []
 }
 
-variable "cloudflare_tunnel_token" {
-  description = "Cloudflare Tunnel token for HTTPS access (from GitHub Secrets)"
-  type        = string
-  sensitive   = true
-}
+# Note: Cloudflare Tunnel is no longer needed with Container Apps
+# Container Apps provides native HTTPS with Azure-managed certificates
+# The following variables have been removed:
+# - cloudflare_tunnel_token (Container Apps has built-in HTTPS)
+# - backend_dns_label (Container Apps auto-generates FQDN)
 
 # FinOps Tags
 variable "cost_center" {
