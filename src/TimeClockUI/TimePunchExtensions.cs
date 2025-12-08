@@ -12,6 +12,12 @@ public static class TimepunchServiceExtensions
 
         var authEnabled = config.GetValue<bool>("Authentication:Enabled", true);
 
+        if (authEnabled)
+        {
+            // Register the custom authorization message handler for API requests
+            services.AddScoped<ApiAuthorizationMessageHandler>();
+        }
+
         var httpClient = services.AddHttpClient(Constants.TimeClientString, client =>
         {
             client.BaseAddress = new Uri(baseUrl);
@@ -19,7 +25,8 @@ public static class TimepunchServiceExtensions
 
         if (authEnabled)
         {
-            httpClient.AddHttpMessageHandler<BaseAddressAuthorizationMessageHandler>();
+            // Use our custom handler that authorizes requests to the external backend API
+            httpClient.AddHttpMessageHandler<ApiAuthorizationMessageHandler>();
         }
 
         services.AddScoped<TimePunchClient>();
