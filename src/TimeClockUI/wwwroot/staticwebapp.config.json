@@ -46,7 +46,7 @@
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://login.microsoftonline.com https://*.msauth.net https://*.microsoft.com; img-src 'self' data: https:; font-src 'self' data:;"
+    "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://login.microsoftonline.com https://*.msauth.net https://*.microsoft.com; connect-src 'self' https://login.microsoftonline.com https://*.msauth.net https://*.microsoft.com BACKEND_URL_PLACEHOLDER; img-src 'self' data: https:; font-src 'self' data:;"
   },
   "platform": {
     "apiRuntime": "dotnet:8.0"

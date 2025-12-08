@@ -83,6 +83,19 @@ jobs:
           echo "Configuration updated:"
           cat $CONFIG_FILE
 
+      - name: Configure CSP Headers
+        run: |
+          CONFIG_FILE="src/TimeClockUI/wwwroot/staticwebapp.config.json"
+          BACKEND_URL="${{ steps.get-infra.outputs.backend_url }}"
+
+          echo "Updating CSP with backend URL: $BACKEND_URL"
+
+          # Replace placeholder with actual backend URL
+          sed -i "s|BACKEND_URL_PLACEHOLDER|$BACKEND_URL|g" $CONFIG_FILE
+
+          echo "CSP configuration updated:"
+          grep "Content-Security-Policy" $CONFIG_FILE
+
       - name: Restore dependencies
         run: dotnet restore src/TimeClockUI/TimeClockUI.csproj
 
