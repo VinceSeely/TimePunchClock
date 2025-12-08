@@ -59,6 +59,17 @@ resource "azurerm_container_app" "backend" {
         value = "true"
       }
 
+      # Enable detailed logging for authentication debugging
+      env {
+        name  = "Logging__LogLevel__Microsoft.AspNetCore.Authentication"
+        value = "Information"
+      }
+
+      env {
+        name  = "Logging__LogLevel__Microsoft.AspNetCore.Authorization"
+        value = "Information"
+      }
+
       # Azure AD Configuration
       env {
         name  = "AzureAd__TenantId"

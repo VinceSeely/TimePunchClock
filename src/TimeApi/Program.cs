@@ -41,20 +41,51 @@ if (authEnabled)
                 : builder.Configuration["AzureAd:Authority"];
 
             options.Authority = authority;
-            options.Audience = builder.Configuration["AzureAd:Audience"];
+
+            // Azure AD tokens can have audience as either:
+            // 1. The client ID (GUID) - most common with delegated scopes
+            // 2. The API identifier URI (api://guid) - less common
+            // We need to accept both formats
+            var audience = builder.Configuration["AzureAd:Audience"];
+            var clientId = builder.Configuration["AzureAd:ClientId"];
 
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateAudience = !builder.Environment.IsDevelopment(), // Disable for local dev
                 ValidateIssuer = true,
                 ValidateLifetime = true,
-                ValidateIssuerSigningKey = true
+                ValidateIssuerSigningKey = true,
+                // Accept both the API identifier URI and the client ID as valid audiences
+                ValidAudiences = new[] { audience, clientId }.Where(a => !string.IsNullOrEmpty(a))
             };
 
             // For local development with IdentityServer
             if (builder.Environment.IsDevelopment())
             {
                 options.RequireHttpsMetadata = false;
+            }
+
+            // Enable detailed authentication logging in non-production environments
+            if (!builder.Environment.IsProduction())
+            {
+                options.Events = new JwtBearerEvents
+                {
+                    OnAuthenticationFailed = context =>
+                    {
+                        Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = context =>
+                    {
+                        Console.WriteLine($"Token validated for: {context.Principal?.Identity?.Name}");
+                        return Task.CompletedTask;
+                    },
+                    OnChallenge = context =>
+                    {
+                        Console.WriteLine($"Authentication challenge: {context.Error}, {context.ErrorDescription}");
+                        return Task.CompletedTask;
+                    }
+                };
             }
         });
 
