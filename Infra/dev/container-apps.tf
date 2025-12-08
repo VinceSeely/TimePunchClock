@@ -88,7 +88,7 @@ resource "azurerm_container_app" "backend" {
 
       env {
         name  = "AzureAd__Authority"
-        value = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}"
+        value = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       }
 
       # CORS Configuration - Always include frontend URL

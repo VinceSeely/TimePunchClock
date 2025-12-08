@@ -36,9 +36,20 @@ if (authEnabled)
         .AddJwtBearer(options =>
         {
             // Support both local IdentityServer and Azure AD
-            var authority = builder.Environment.IsDevelopment()
-                ? builder.Configuration["IdentityServer:Authority"]
-                : builder.Configuration["AzureAd:Authority"];
+            // Prefer IdentityServer for local development only when explicitly configured
+            // Otherwise use Azure AD authority (even in Development environment)
+            var identityServerAuthority = builder.Configuration["IdentityServer:Authority"];
+            var azureAdAuthority = builder.Configuration["AzureAd:Authority"];
+
+            var authority = !string.IsNullOrEmpty(identityServerAuthority) && builder.Environment.IsDevelopment()
+                ? identityServerAuthority
+                : azureAdAuthority;
+
+            if (string.IsNullOrEmpty(authority))
+            {
+                throw new InvalidOperationException(
+                    "Authentication authority not configured. Set either 'IdentityServer:Authority' for local dev or 'AzureAd:Authority' for Azure AD.");
+            }
 
             options.Authority = authority;
 
