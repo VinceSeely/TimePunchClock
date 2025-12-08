@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using TimeClock.Client;
 using TimeClockUI.Models;
 
@@ -7,6 +8,7 @@ namespace TimeClockUI.Pages;
 public partial class MonthSummary
 {
     [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
+    [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private List<MonthOption> _months = new()
     {
@@ -33,6 +35,7 @@ public partial class MonthSummary
     private DateTime _startDate;
     private DateTime _endDate;
     private List<int> _years = Enumerable.Range(2025, 20).ToList(); // 2025–2044
+    private bool _isAuthenticated = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -44,7 +47,20 @@ public partial class MonthSummary
         _startDate = new(_selectedYear, _selectedMonth, 1);
         _endDate = _startDate.AddMonths(1).AddDays(-1);
 
-        await CalculateHours();
+        // Check if user is authenticated before making API calls
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isAuthenticated = user.Identity?.IsAuthenticated == true;
+
+        if (_isAuthenticated)
+        {
+            await CalculateHours();
+        }
+        else
+        {
+            // User is not logged in, initialize with empty data
+            _todaysPunchs = Enumerable.Empty<PunchRecord>();
+        }
     }
 
     private async Task CalculateHours()

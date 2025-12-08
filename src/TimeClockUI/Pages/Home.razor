@@ -6,28 +6,47 @@
 
 <PageTitle>Punch Clock</PageTitle>
 
-<h1>@DisplayNextPunchStatus</h1>
+<AuthorizeView>
+    <Authorized>
+        <h1>@DisplayNextPunchStatus</h1>
 
-<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
-<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@_ShouldPunchIn">Punch Out</MudButton>
-<MudText Typo="@Typo.h4">Hours Type:</MudText>
-<MudSelect Label="Show Hours" @bind-Value="@_punchType"> 
-    @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))
-    {
-        <MudSelectItem Value="@hourType">@GetPunchTypeDisplayString(hourType)</MudSelectItem>
-    }
-</MudSelect>
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@_ShouldPunchIn">Punch Out</MudButton>
+        <MudText Typo="@Typo.h4">Hours Type:</MudText>
+        <MudSelect Label="Show Hours" @bind-Value="@_punchType">
+            @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))
+            {
+                <MudSelectItem Value="@hourType">@GetPunchTypeDisplayString(hourType)</MudSelectItem>
+            }
+        </MudSelect>
 
-<MudSwitch @bind-value="@_showHours"></MudSwitch >
+        <MudSwitch @bind-value="@_showHours"></MudSwitch >
 
-@if(_showHours){
+        @if(_showHours){
 
-    <MudText Typo="Typo.h1">Hours Worked Today:</MudText>
+            <MudText Typo="Typo.h1">Hours Worked Today:</MudText>
 
-    <MudText Typo="@Typo.h3">Tech lead Hours</MudText>
-    <MudText Typo="@Typo.body1">@_techLeadHoursTotal</MudText>
-    <MudText Typo="@Typo.h3">Regular Hours</MudText>
-    <MudText Typo="@Typo.body1">@_regularHoursTotal</MudText>
-    <MudText Typo="@Typo.h3">Total Hours</MudText>
-    <MudText Typo="@Typo.body1">@_combinedHoursTotal</MudText>
-}
+            <MudText Typo="@Typo.h3">Tech lead Hours</MudText>
+            <MudText Typo="@Typo.body1">@_techLeadHoursTotal</MudText>
+            <MudText Typo="@Typo.h3">Regular Hours</MudText>
+            <MudText Typo="@Typo.body1">@_regularHoursTotal</MudText>
+            <MudText Typo="@Typo.h3">Total Hours</MudText>
+            <MudText Typo="@Typo.body1">@_combinedHoursTotal</MudText>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <MudCard Class="ma-4">
+            <MudCardContent>
+                <MudText Typo="@Typo.h4" Class="mb-4">Welcome to Time Punch Clock</MudText>
+                <MudText Typo="@Typo.body1" Class="mb-2">
+                    Please log in to track your time and view your punch history.
+                </MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="authentication/login">
+                    Log In
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </NotAuthorized>
+</AuthorizeView>

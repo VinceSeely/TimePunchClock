@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using TimeClock.Client;
 
 namespace TimeClockUI.Pages;
@@ -6,6 +7,7 @@ namespace TimeClockUI.Pages;
 public partial class Home
 {
     [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
+    [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private string DisplayNextPunchStatus =>
         $"Please Punch {(_ShouldPunchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
@@ -19,12 +21,27 @@ public partial class Home
     private string _regularHoursTotal = "0:00";
     private string _combinedHoursTotal = "00:00";
     private IEnumerable<PunchRecord> _todaysPunchs = null!;
+    private bool _isAuthenticated = false;
 
     protected override async Task OnInitializedAsync()
     {
-        _lastPunch = await TimePunchClient.GetLastPunch();
-        _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
-        CalculateAndSetHours();
+        // Check if user is authenticated before making API calls
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isAuthenticated = user.Identity?.IsAuthenticated == true;
+
+        if (_isAuthenticated)
+        {
+            // User is logged in, safe to make API calls
+            _lastPunch = await TimePunchClient.GetLastPunch();
+            _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
+            CalculateAndSetHours();
+        }
+        else
+        {
+            // User is not logged in, initialize with empty data
+            _todaysPunchs = Enumerable.Empty<PunchRecord>();
+        }
     }
 
     private string GetLastPunchTimeString()
