@@ -20,4 +20,6 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 # Explicitly copy appsettings files
 COPY --from=build /src/TimeApi/appsettings*.json ./
+# Set ASP.NET Core to listen on port 80 instead of default 8080
+ENV ASPNETCORE_URLS=http://+:80
 ENTRYPOINT ["dotnet", "TimeApi.dll"]
