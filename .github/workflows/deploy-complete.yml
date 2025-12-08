@@ -60,23 +60,48 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./Infra/${{ inputs.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: terraform init
 
       - name: Terraform Validate
         working-directory: ./Infra/${{ inputs.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: terraform validate
 
       - name: Terraform Plan
         working-directory: ./Infra/${{ inputs.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: terraform plan -out=tfplan -var="cloudflare_tunnel_token=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}"
 
       - name: Terraform Apply
         working-directory: ./Infra/${{ inputs.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: terraform apply -auto-approve tfplan
 
       - name: Get Infrastructure Outputs
         id: get-outputs
         working-directory: ./Infra/${{ inputs.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           BACKEND_URL=$(terraform output -raw backend_url)
           SWA_URL=$(terraform output -raw static_web_app_url)

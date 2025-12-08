@@ -44,16 +44,31 @@ jobs:
       - name: Terraform Init
         id: init
         working-directory: ./Infra/${{ matrix.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: terraform init
 
       - name: Terraform Validate
         id: validate
         working-directory: ./Infra/${{ matrix.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: terraform validate -no-color
 
       - name: Terraform Plan
         id: plan
         working-directory: ./Infra/${{ matrix.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           terraform plan -no-color -out=tfplan
           terraform show -no-color tfplan > plan_output.txt
