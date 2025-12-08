@@ -38,7 +38,7 @@ jobs:
     if: ${{ !inputs.skip_infrastructure }}
     environment: ${{ inputs.environment }}
     outputs:
-      backend_url: ${{ steps.get-outputs.outputs.backend_url }}
+      backend_url: ${{ steps.get-outputs.outputs.backend_container_app_url }}
       swa_url: ${{ steps.get-outputs.outputs.swa_url }}
 
     steps:
