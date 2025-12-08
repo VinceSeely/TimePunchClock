@@ -137,14 +137,14 @@ output "finops_tags" {
 output "resource_summary" {
   description = "Summary of deployed resources for cost analysis"
   value = {
-    resource_group           = azurerm_resource_group.main.name
-    location                 = azurerm_resource_group.main.location
-    sql_server_sku           = "Basic"
-    static_web_app_sku       = "Free"
-    container_app_cpu        = "0.5"
-    container_app_memory     = "1Gi"
+    resource_group             = azurerm_resource_group.main.name
+    location                   = azurerm_resource_group.main.location
+    sql_server_sku             = "Basic"
+    static_web_app_sku         = "Free"
+    container_app_cpu          = "0.5"
+    container_app_memory       = "1Gi"
     container_app_min_replicas = "0 (scale to zero)"
     container_app_max_replicas = "3"
-    estimated_monthly_cost   = "~$6-9 USD (SQL Basic ~$5 + Container Apps ~$1-4 + Key Vault ~$0.50 + Log Analytics ~$0.50)"
+    estimated_monthly_cost     = "~$6-9 USD (SQL Basic ~$5 + Container Apps ~$1-4 + Key Vault ~$0.50 + Log Analytics ~$0.50)"
   }
 }
