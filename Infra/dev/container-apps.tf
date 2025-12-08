@@ -80,11 +80,22 @@ resource "azurerm_container_app" "backend" {
         value = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}"
       }
 
-      # CORS Configuration - dynamically add allowed origins
+      # CORS Configuration - Always include frontend URL
+      env {
+        name  = "Cors__AllowedOrigins__0"
+        value = "https://${azurerm_static_web_app.blazor.default_host_name}"
+      }
+
+      env {
+        name  = "Cors__AllowedOrigins__1"
+        value = "http://localhost:5000" # For local development
+      }
+
+      # CORS Configuration - dynamically add additional allowed origins
       dynamic "env" {
         for_each = length(var.cors_allowed_origins) > 0 ? { for idx, origin in var.cors_allowed_origins : idx => origin } : {}
         content {
-          name  = "Cors__AllowedOrigins__${env.key}"
+          name  = "Cors__AllowedOrigins__${env.key + 2}"
           value = env.value
         }
       }
@@ -122,9 +133,10 @@ resource "azurerm_container_app" "backend" {
 
   tags = local.tags
 
-  # Ensure Key Vault secret exists before creating Container App
+  # Ensure Key Vault secret and Static Web App exist before creating Container App
   depends_on = [
-    azurerm_key_vault_secret.sql_connection_string
+    azurerm_key_vault_secret.sql_connection_string,
+    azurerm_static_web_app.blazor
   ]
 }
 
