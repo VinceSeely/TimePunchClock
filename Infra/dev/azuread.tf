@@ -35,6 +35,12 @@ resource "azuread_application" "api" {
     "environment:${local.environment}",
     "managed-by:terraform"
   ]
+
+  lifecycle {
+    ignore_changes = [
+      identifier_uris
+    ]
+  }
 }
 
 # Generate a random UUID for the API scope
