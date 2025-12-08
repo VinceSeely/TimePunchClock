@@ -48,6 +48,7 @@ if (authEnabled)
             // We need to accept both formats
             var audience = builder.Configuration["AzureAd:Audience"];
             var clientId = builder.Configuration["AzureAd:ClientId"];
+            var tenantId = builder.Configuration["AzureAd:TenantId"];
 
             options.TokenValidationParameters = new TokenValidationParameters
             {
@@ -56,7 +57,16 @@ if (authEnabled)
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 // Accept both the API identifier URI and the client ID as valid audiences
-                ValidAudiences = new[] { audience, clientId }.Where(a => !string.IsNullOrEmpty(a))
+                ValidAudiences = new[] { audience, clientId }.Where(a => !string.IsNullOrEmpty(a)),
+                // Azure AD tokens can come from two different issuer endpoints:
+                // 1. https://login.microsoftonline.com/{tenantId}/v2.0 (modern/v2 endpoint)
+                // 2. https://sts.windows.net/{tenantId}/ (legacy/v1 endpoint)
+                // Both are valid and we need to accept tokens from either
+                ValidIssuers = new[]
+                {
+                    $"https://login.microsoftonline.com/{tenantId}/v2.0",
+                    $"https://sts.windows.net/{tenantId}/"
+                }.Where(i => !string.IsNullOrEmpty(tenantId))
             };
 
             // For local development with IdentityServer
