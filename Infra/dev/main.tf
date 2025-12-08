@@ -67,6 +67,14 @@ resource "azurerm_key_vault" "kv" {
   }
 
   tags = local.tags
+
+  # Lifecycle policy to prevent errors when soft_delete_retention_days cannot be changed
+  # Azure does not allow modifying soft_delete_retention_days after Key Vault creation
+  lifecycle {
+    ignore_changes = [
+      soft_delete_retention_days
+    ]
+  }
 }
 
 # Generate random password for SQL Server

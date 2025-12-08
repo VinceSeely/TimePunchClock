@@ -1,16 +1,6 @@
 # Azure Container Apps Configuration
 # This replaces the Azure Container Instance with a more cost-effective and scalable solution
 
-# Container App Environment
-# This is the hosting environment for Container Apps (similar to an App Service Plan)
-resource "azurerm_container_app_environment" "main" {
-  name                = "cae-timeclock-${local.environment}"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-
-  tags = local.tags
-}
-
 # Log Analytics Workspace for Container Apps
 # Required for Container App Environment monitoring and logging
 resource "azurerm_log_analytics_workspace" "container_apps" {
@@ -23,8 +13,10 @@ resource "azurerm_log_analytics_workspace" "container_apps" {
   tags = local.tags
 }
 
-# Update Container App Environment with Log Analytics
-resource "azurerm_container_app_environment" "main_with_logs" {
+# Container App Environment
+# This is the hosting environment for Container Apps (similar to an App Service Plan)
+# Includes Log Analytics for monitoring and logging
+resource "azurerm_container_app_environment" "main" {
   name                       = "cae-timeclock-${local.environment}"
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
@@ -36,7 +28,7 @@ resource "azurerm_container_app_environment" "main_with_logs" {
 # Backend API Container App
 resource "azurerm_container_app" "backend" {
   name                         = "ca-backend-${local.environment}"
-  container_app_environment_id = azurerm_container_app_environment.main_with_logs.id
+  container_app_environment_id = azurerm_container_app_environment.main.id
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 
