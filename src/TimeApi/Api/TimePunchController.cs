@@ -14,13 +14,37 @@ namespace TimeApi.Api
     [ApiController]
     public class TimePunchController(ITimePunchRepository punchRepository) : ControllerBase
     {
+        private string GetAuthId()
+        {
+            // Check if authentication is disabled (development mode)
+            if (User.Identity?.IsAuthenticated != true)
+            {
+                return "dev-user";
+            }
 
+            // Try to get 'oid' (Object ID) claim from Azure AD
+            var oidClaim = User.FindFirst("oid")
+                ?? User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");
+
+            if (oidClaim != null)
+                return oidClaim.Value;
+
+            // Fallback to 'sub' (Subject) for other identity providers
+            var subClaim = User.FindFirst("sub")
+                ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
+
+            if (subClaim != null)
+                return subClaim.Value;
+
+            throw new UnauthorizedAccessException("User identifier not found in token claims");
+        }
 
         [HttpGet]
         [Authorize]
         public ActionResult GetHours(DateTime start, DateTime end)
         {
-            var results = punchRepository.GetPunchRecords(start, end);
+            var authId = GetAuthId();
+            var results = punchRepository.GetPunchRecords(start, end, authId);
             if (results == null || !results.Any())
             {
                 return Ok(Array.Empty<PunchRecord>());
@@ -32,8 +56,9 @@ namespace TimeApi.Api
         [Authorize]
         public ActionResult PunchHours(PunchInfo punchInfo)
         {
-            punchRepository.InsertPunch(punchInfo);
-            var lastPunch = punchRepository.GetLastPunch();
+            var authId = GetAuthId();
+            punchRepository.InsertPunch(punchInfo, authId);
+            var lastPunch = punchRepository.GetLastPunch(authId);
 
             return Ok(lastPunch);
 
@@ -43,7 +68,8 @@ namespace TimeApi.Api
         [Authorize]
         public ActionResult GetLastPunch()
         {
-            var lastPunch = punchRepository.GetLastPunch();
+            var authId = GetAuthId();
+            var lastPunch = punchRepository.GetLastPunch(authId);
 
             if (lastPunch == null)
             {

@@ -9,10 +9,11 @@ namespace TimeApi.Services;
 public class TimePunchRepository(TimeClockDbContext context) : ITimePunchRepository
 {
 
-    public void InsertPunch(PunchInfo punch)
+    public void InsertPunch(PunchInfo punch, string authId)
     {
         PunchEntity newPunch;
         var latestPunch = context.Punchs
+            .Where(p => p.AuthId == authId)
             .OrderByDescending(p => p.PunchIn)
             .FirstOrDefault();
         if (punch.PunchType == PunchType.PunchOut && latestPunch != null && latestPunch.PunchOut == null)
@@ -29,30 +30,37 @@ public class TimePunchRepository(TimeClockDbContext context) : ITimePunchReposit
             {
                 PunchIn = DateTime.Now,
                 HourType = punch.HourType,
-                WorkDescription = punch.WorkDescription
+                WorkDescription = punch.WorkDescription,
+                AuthId = authId
             };
             context.Punchs.Add(newPunch);
         }
         context.SaveChanges();
     }
 
-    public IEnumerable<PunchRecord> GetPunchRecords(DateTime start, DateTime end)
+    public IEnumerable<PunchRecord> GetPunchRecords(DateTime start, DateTime end, string authId)
     {
-        var query = context.Punchs.Where(punch => punch.PunchIn.Date >= start.Date && punch.PunchOut != null && punch.PunchOut.Value.Date <= end.Date).Select(x => new PunchRecord
-        {
-            PunchIn = x.PunchIn,
-            PunchOut = x.PunchOut.Value,
-            HourType = x.HourType,
-            PunchId = x.PunchId,
-            AuthId = x.AuthId,
-            WorkDescription = x.WorkDescription
-        });
+        var query = context.Punchs
+            .Where(punch => punch.AuthId == authId &&
+                           punch.PunchIn.Date >= start.Date &&
+                           punch.PunchOut != null &&
+                           punch.PunchOut.Value.Date <= end.Date)
+            .Select(x => new PunchRecord
+            {
+                PunchIn = x.PunchIn,
+                PunchOut = x.PunchOut.Value,
+                HourType = x.HourType,
+                PunchId = x.PunchId,
+                AuthId = x.AuthId,
+                WorkDescription = x.WorkDescription
+            });
         return query;
     }
 
-    public PunchRecord? GetLastPunch()
+    public PunchRecord? GetLastPunch(string authId)
     {
         var mostRecentPunch = context.Punchs
+            .Where(punch => punch.AuthId == authId)
             .OrderByDescending(punch => punch.PunchIn)
             .ThenByDescending(punch => punch.PunchOut)
             .FirstOrDefault();

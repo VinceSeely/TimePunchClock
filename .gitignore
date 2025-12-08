@@ -12,6 +12,10 @@ project.lock.json
 # User stories
 user-stories/
 
+# Temporary SQL admin access files (should be deleted when no longer needed)
+temp-sql-admin.*
+TEMP-ACCESS-README.md
+
 # Visual Studio Code
 .vscode
 
