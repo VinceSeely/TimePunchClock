@@ -370,4 +370,228 @@ public class TimePunchControllerTests
     }
 
     #endregion
+
+    #region UpdatePunch Tests
+
+    [Test]
+    public void UpdatePunch_ReturnsOkWithUpdatedRecord_WhenUpdateSucceeds()
+    {
+        // Arrange
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = Guid.NewGuid(),
+            PunchIn = DateTime.Today.AddHours(9).AddMinutes(15),
+            PunchOut = DateTime.Today.AddHours(17).AddMinutes(15),
+            HourType = HourType.Regular
+        };
+
+        var updatedRecord = new PunchRecord
+        {
+            PunchId = updateDto.PunchId,
+            PunchIn = updateDto.PunchIn,
+            PunchOut = updateDto.PunchOut,
+            HourType = HourType.Regular
+        };
+
+        _mockRepository
+            .Setup(r => r.UpdatePunch(updateDto, TestAuthId))
+            .Returns(updatedRecord);
+
+        // Act
+        var result = _controller.UpdatePunch(updateDto);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+        var okResult = (OkObjectResult)result;
+        okResult.Value.Should().BeEquivalentTo(updatedRecord);
+    }
+
+    [Test]
+    public void UpdatePunch_ReturnsNotFound_WhenPunchNotFound()
+    {
+        // Arrange
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = Guid.NewGuid(),
+            PunchIn = DateTime.Today.AddHours(9),
+            PunchOut = DateTime.Today.AddHours(17),
+            HourType = HourType.Regular
+        };
+
+        _mockRepository
+            .Setup(r => r.UpdatePunch(updateDto, TestAuthId))
+            .Throws(new InvalidOperationException("Punch record not found"));
+
+        // Act
+        var result = _controller.UpdatePunch(updateDto);
+
+        // Assert
+        result.Should().BeOfType<NotFoundObjectResult>();
+        var notFoundResult = (NotFoundObjectResult)result;
+        notFoundResult.Value.Should().BeEquivalentTo(new { message = "Punch record not found" });
+    }
+
+    [Test]
+    public void UpdatePunch_ReturnsUnauthorized_WhenUserNotAuthorized()
+    {
+        // Arrange
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = Guid.NewGuid(),
+            PunchIn = DateTime.Today.AddHours(9),
+            PunchOut = DateTime.Today.AddHours(17),
+            HourType = HourType.Regular
+        };
+
+        _mockRepository
+            .Setup(r => r.UpdatePunch(updateDto, TestAuthId))
+            .Throws(new UnauthorizedAccessException("You are not authorized to update this punch record"));
+
+        // Act
+        var result = _controller.UpdatePunch(updateDto);
+
+        // Assert
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+        var unauthorizedResult = (UnauthorizedObjectResult)result;
+        unauthorizedResult.Value.Should().BeEquivalentTo(new { message = "You are not authorized to update this punch record" });
+    }
+
+    [Test]
+    public void UpdatePunch_ReturnsBadRequest_WhenValidationFails()
+    {
+        // Arrange
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = Guid.NewGuid(),
+            PunchIn = DateTime.Today.AddHours(17),
+            PunchOut = DateTime.Today.AddHours(9), // Invalid: out before in
+            HourType = HourType.Regular
+        };
+
+        _mockRepository
+            .Setup(r => r.UpdatePunch(updateDto, TestAuthId))
+            .Throws(new ArgumentException("Punch out time must be after punch in time"));
+
+        // Act
+        var result = _controller.UpdatePunch(updateDto);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+        var badRequestResult = (BadRequestObjectResult)result;
+        badRequestResult.Value.Should().BeEquivalentTo(new { message = "Punch out time must be after punch in time" });
+    }
+
+    [Test]
+    public void UpdatePunch_CallsRepositoryWithCorrectAuthId()
+    {
+        // Arrange
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = Guid.NewGuid(),
+            PunchIn = DateTime.Today.AddHours(9),
+            PunchOut = DateTime.Today.AddHours(17),
+            HourType = HourType.Regular
+        };
+
+        var updatedRecord = new PunchRecord
+        {
+            PunchId = updateDto.PunchId,
+            PunchIn = updateDto.PunchIn,
+            PunchOut = updateDto.PunchOut,
+            HourType = HourType.Regular
+        };
+
+        _mockRepository
+            .Setup(r => r.UpdatePunch(
+                It.Is<PunchUpdateDto>(dto =>
+                    dto.PunchId == updateDto.PunchId &&
+                    dto.PunchIn == updateDto.PunchIn &&
+                    dto.PunchOut == updateDto.PunchOut &&
+                    dto.HourType == updateDto.HourType),
+                TestAuthId))
+            .Returns(updatedRecord)
+            .Verifiable();
+
+        // Act
+        _controller.UpdatePunch(updateDto);
+
+        // Assert verified by MockBehavior.Strict and VerifyAll() in TearDown
+    }
+
+    #endregion
+
+    #region DeletePunch Tests
+
+    [Test]
+    public void DeletePunch_ReturnsNoContent_WhenSuccessful()
+    {
+        // Arrange
+        var punchId = Guid.NewGuid();
+
+        _mockRepository
+            .Setup(r => r.DeletePunch(punchId, TestAuthId))
+            .Verifiable();
+
+        // Act
+        var result = _controller.DeletePunch(punchId);
+
+        // Assert
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Test]
+    public void DeletePunch_ReturnsNotFound_WhenPunchNotFound()
+    {
+        // Arrange
+        var punchId = Guid.NewGuid();
+
+        _mockRepository
+            .Setup(r => r.DeletePunch(punchId, TestAuthId))
+            .Throws(new InvalidOperationException("Punch record not found"));
+
+        // Act
+        var result = _controller.DeletePunch(punchId);
+
+        // Assert
+        result.Should().BeOfType<NotFoundObjectResult>();
+        var notFoundResult = (NotFoundObjectResult)result;
+        notFoundResult.Value.Should().BeEquivalentTo(new { message = "Punch record not found" });
+    }
+
+    [Test]
+    public void DeletePunch_ReturnsUnauthorized_WhenUserNotAuthorized()
+    {
+        // Arrange
+        var punchId = Guid.NewGuid();
+
+        _mockRepository
+            .Setup(r => r.DeletePunch(punchId, TestAuthId))
+            .Throws(new UnauthorizedAccessException("You are not authorized to delete this punch record"));
+
+        // Act
+        var result = _controller.DeletePunch(punchId);
+
+        // Assert
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+        var unauthorizedResult = (UnauthorizedObjectResult)result;
+        unauthorizedResult.Value.Should().BeEquivalentTo(new { message = "You are not authorized to delete this punch record" });
+    }
+
+    [Test]
+    public void DeletePunch_CallsRepositoryWithCorrectAuthId()
+    {
+        // Arrange
+        var punchId = Guid.NewGuid();
+
+        _mockRepository
+            .Setup(r => r.DeletePunch(punchId, TestAuthId))
+            .Verifiable();
+
+        // Act
+        _controller.DeletePunch(punchId);
+
+        // Assert verified by MockBehavior.Strict and VerifyAll() in TearDown
+    }
+
+    #endregion
 }

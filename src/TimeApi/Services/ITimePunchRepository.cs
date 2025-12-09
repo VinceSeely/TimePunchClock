@@ -9,4 +9,6 @@ public interface ITimePunchRepository
     IEnumerable<PunchRecord> GetPunchRecords(DateTime start, DateTime end, string authId);
     PunchRecord? GetLastPunch(string authId);
     Task<int> BulkInsertPunchesAsync(IEnumerable<PunchEntity> punches, string authId);
+    PunchRecord UpdatePunch(PunchUpdateDto updateDto, string authId);
+    void DeletePunch(Guid punchId, string authId);
 }
