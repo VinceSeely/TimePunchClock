@@ -1,0 +1,5 @@
+PunchIn,PunchOut,HourType,WorkDescription
+2024-12-01 09:00:00,2024-12-01 17:00:00,Regular,"Work with commas, semicolons; and quotes"
+2024-12-02 09:00:00,2024-12-02 17:00:00,Regular,Special chars @#$%^&*()
+2024-12-03 09:00:00,2024-12-03 17:00:00,TechLead,Unicode: 你好 مرحبا Здравствуйте
+2024-12-04 09:00:00,2024-12-04 17:00:00,Regular,Emojis: 🚀 💻 ✅

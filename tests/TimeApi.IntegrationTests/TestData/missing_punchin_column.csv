@@ -1,0 +1,3 @@
+PunchOut,HourType,WorkDescription
+2024-12-01 17:00:00,Regular,Missing PunchIn column
+2024-12-02 17:00:00,TechLead,This should fail

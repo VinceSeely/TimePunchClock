@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 using TimeClock.Client;
 using TimeClockUI;
@@ -57,6 +58,12 @@ if (authEnabled)
             }
         });
     }
+}
+else
+{
+    // Register anonymous authentication provider for development
+    builder.Services.AddAuthorizationCore();
+    builder.Services.AddScoped<AuthenticationStateProvider, AnonymousAuthenticationStateProvider>();
 }
 
 builder.Services.RegsiterTimeClient(builder.Configuration);

@@ -80,4 +80,18 @@ public class TimePunchRepository(TimeClockDbContext context) : ITimePunchReposit
             WorkDescription = mostRecentPunch.WorkDescription
         };
     }
+
+    public async Task<int> BulkInsertPunchesAsync(IEnumerable<PunchEntity> punches, string authId)
+    {
+        // Ensure all punches belong to the authenticated user
+        var validPunches = punches.Where(p => p.AuthId == authId).ToList();
+
+        if (validPunches.Count == 0)
+            return 0;
+
+        await context.Punchs.AddRangeAsync(validPunches);
+        await context.SaveChangesAsync();
+
+        return validPunches.Count;
+    }
 }
