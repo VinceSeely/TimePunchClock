@@ -1,6 +1,8 @@
-﻿namespace TimeClock.client;
+﻿namespace TimeClock.Client;
 
-public class Class1
+public record PunchInfo
 {
-
+    public PunchType PunchType { get; init; }
+    public HourType HourType { get; init; }
+    public string? WorkDescription { get; init; }
 }

@@ -17,6 +17,8 @@ public partial class Home
     private HourType _punchType;
     private bool _showHours = false;
     private PunchRecord? _lastPunch;
+
+    private string _workDescription = string.Empty;
     private string _techLeadHoursTotal = "0:00";
     private string _regularHoursTotal = "0:00";
     private string _combinedHoursTotal = "00:00";
@@ -61,7 +63,7 @@ public partial class Home
 
     private async Task PunchIn()
     {
-        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchIn);
+        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchIn, _workDescription);
         _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
         CalculateAndSetHours();
         StateHasChanged();
@@ -69,7 +71,7 @@ public partial class Home
 
     private async Task PunchOut()
     {
-        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchOut);
+        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchOut, _workDescription);
         _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
         CalculateAndSetHours();
         StateHasChanged();

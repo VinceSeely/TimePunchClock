@@ -43,13 +43,14 @@ public class TimePunchClient(IHttpClientFactory clientFactory)
         return null;
     }
 
-    public async Task<PunchRecord> Punch(HourType hourType, PunchType punchType)
+    public async Task<PunchRecord> Punch(HourType hourType, PunchType punchType, string workDescription)
     {
         var client = clientFactory.CreateClient(Constants.TimeClientString);
         var punchInfo = new PunchInfo
         {
             PunchType = punchType,
             HourType = hourType,
+            WorkDescription = workDescription
         };
 
         var json = JsonConvert.SerializeObject(punchInfo);
