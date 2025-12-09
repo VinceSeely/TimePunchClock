@@ -29,4 +29,10 @@
     <ProjectReference Include="..\..\src\TimeClock.client\TimeClock.client.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="TestData\*.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

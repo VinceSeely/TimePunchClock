@@ -1,0 +1,452 @@
+@page "/upload-history"
+@using System.Net.Http.Headers
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using System.Text.Json
+@using Microsoft.JSInterop
+@inject HttpClient Http
+@inject IAccessTokenProvider TokenProvider
+@inject IConfiguration Configuration
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Upload Punch History</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+            <MudText Typo="Typo.h4" Class="mb-4">Upload Punch History from CSV</MudText>
+
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                <MudText Typo="Typo.body1">
+                    <strong>Important:</strong> CSV uploads will import punch records under your user account only.
+                    You cannot import hours for other users.
+                </MudText>
+            </MudAlert>
+
+            <MudPaper Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">CSV File Format</MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Your CSV file should have the following columns:
+                </MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">
+                        <strong>PunchIn</strong> (Required) - Date and time you punched in (e.g., 2024-01-01 09:00:00)
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Circle">
+                        <strong>PunchOut</strong> (Optional) - Date and time you punched out
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Circle">
+                        <strong>HourType</strong> (Optional) - Either "Regular" or "TechLead" (defaults to Regular)
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Circle">
+                        <strong>WorkDescription</strong> (Optional) - Description of work performed
+                    </MudListItem>
+                </MudList>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="DownloadTemplate"
+                           Class="mt-3">
+                    Download CSV Template
+                </MudButton>
+            </MudPaper>
+
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Select CSV File</MudText>
+
+                <InputFile id="fileInput"
+                           OnChange="OnFileSelected"
+                           accept=".csv"
+                           disabled="@_uploading"
+                           style="display: none;" />
+
+                <MudButton HtmlTag="label"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.CloudUpload"
+                           for="fileInput"
+                           Disabled="@_uploading">
+                    Choose File
+                </MudButton>
+
+                @if (_selectedFile != null)
+                {
+                    <MudChip T="string" Color="Color.Info" Class="ml-2">
+                        @_selectedFile.Name (@FormatFileSize(_selectedFile.Size))
+                    </MudChip>
+                }
+
+                @if (_selectedFile != null)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Upload"
+                               OnClick="UploadFile"
+                               Disabled="@_uploading"
+                               Class="ml-2">
+                        Upload and Import
+                    </MudButton>
+                }
+
+                @if (_uploading)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+                    <MudText Typo="Typo.body2" Class="mt-2">Processing CSV file...</MudText>
+                }
+            </MudPaper>
+
+            @if (_previewRecords != null && _previewRecords.Count > 0)
+            {
+                <MudPaper Class="pa-4 mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">CSV Preview (First @Math.Min(10, _previewRecords.Count) Records)</MudText>
+                    <MudTable Items="@_previewRecords.Take(10)" Hover="true" Dense="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Punch In</MudTh>
+                            <MudTh>Punch Out</MudTh>
+                            <MudTh>Hour Type</MudTh>
+                            <MudTh>Work Description</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="record">
+                            <MudTd DataLabel="Punch In">@record.PunchIn</MudTd>
+                            <MudTd DataLabel="Punch Out">@record.PunchOut</MudTd>
+                            <MudTd DataLabel="Hour Type">@record.HourType</MudTd>
+                            <MudTd DataLabel="Work Description">@(record.WorkDescription?.Length > 50 ? record.WorkDescription.Substring(0, 50) + "..." : record.WorkDescription)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        Total records in file: @_previewRecords.Count
+                    </MudText>
+                </MudPaper>
+            }
+
+            @if (_uploadResult != null)
+            {
+                <MudPaper Class="pa-4 mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Import Results</MudText>
+
+                    @if (_uploadResult.IsSuccess)
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Successfully imported @_uploadResult.SuccessCount punch record(s)!
+                        </MudAlert>
+                    }
+                    else if (_uploadResult.SuccessCount > 0)
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mb-3">
+                            Partially successful: @_uploadResult.SuccessCount imported, @_uploadResult.FailureCount failed
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-3">
+                            Import failed: @_uploadResult.FailureCount error(s)
+                        </MudAlert>
+                    }
+
+                    @if (_uploadResult.Errors.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle1" Class="mb-2"><strong>Errors:</strong></MudText>
+                        <MudList T="string" Dense="true">
+                            @foreach (var error in _uploadResult.Errors)
+                            {
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.Error" IconColor="Color.Error">
+                                    @error
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+            }
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4" CloseIcon="@Icons.Material.Filled.Close" CloseIconClicked="ClearError">
+                    @_errorMessage
+                </MudAlert>
+            }
+        </MudContainer>
+    </Authorized>
+    <NotAuthorized>
+        <MudCard Class="ma-4">
+            <MudCardContent>
+                <MudText Typo="@Typo.h4" Class="mb-4">Authentication Required</MudText>
+                <MudText Typo="@Typo.body1" Class="mb-2">
+                    Please log in to upload your punch history.
+                </MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="authentication/login">
+                    Log In
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private IBrowserFile? _selectedFile;
+    private bool _uploading;
+    private CsvImportResult? _uploadResult;
+    private string? _errorMessage;
+    private List<CsvPreviewRecord>? _previewRecords;
+    private const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _uploadResult = null;
+        _errorMessage = null;
+        _previewRecords = null;
+
+        if (_selectedFile != null)
+        {
+            await PreviewCsvFile();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task UploadFile()
+    {
+        if (_selectedFile == null)
+            return;
+
+        _uploading = true;
+        _uploadResult = null;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // Validate file size
+            if (_selectedFile.Size > MaxFileSize)
+            {
+                _errorMessage = $"File size ({FormatFileSize(_selectedFile.Size)}) exceeds maximum allowed size of 10 MB";
+                return;
+            }
+
+            // Create multipart form data
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(_selectedFile.OpenReadStream(MaxFileSize));
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+            content.Add(fileContent, "file", _selectedFile.Name);
+
+            // Get access token
+            var tokenResult = await TokenProvider.RequestAccessToken();
+            string? accessToken = null;
+
+            if (tokenResult.TryGetToken(out var token))
+            {
+                accessToken = token.Value;
+            }
+
+            // Create HTTP request
+            var apiBaseUrl = Configuration["ApiBaseUrl"] ?? "https://localhost:7285";
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{apiBaseUrl}/api/csvupload/upload");
+
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            }
+
+            requestMessage.Content = content;
+
+            // Send request
+            var response = await Http.SendAsync(requestMessage);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _uploadResult = JsonSerializer.Deserialize<CsvImportResult>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"Upload failed: {response.StatusCode} - {errorContent}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error uploading file: {ex.Message}";
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadTemplate()
+    {
+        try
+        {
+            var tokenResult = await TokenProvider.RequestAccessToken();
+            string? accessToken = null;
+
+            if (tokenResult.TryGetToken(out var token))
+            {
+                accessToken = token.Value;
+            }
+
+            var apiBaseUrl = Configuration["ApiBaseUrl"] ?? "https://localhost:7285";
+            var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{apiBaseUrl}/api/csvupload/template");
+
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            }
+
+            var response = await Http.SendAsync(requestMessage);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var fileBytes = await response.Content.ReadAsByteArrayAsync();
+                await JSRuntime.InvokeVoidAsync("downloadFileFromByteArray",
+                    "punch_import_template.csv",
+                    "text/csv",
+                    fileBytes);
+            }
+            else
+            {
+                _errorMessage = "Failed to download template";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error downloading template: {ex.Message}";
+        }
+    }
+
+    private void ClearError()
+    {
+        _errorMessage = null;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private async Task PreviewCsvFile()
+    {
+        if (_selectedFile == null)
+            return;
+
+        try
+        {
+            _previewRecords = new List<CsvPreviewRecord>();
+
+            using var stream = _selectedFile.OpenReadStream(MaxFileSize);
+            using var reader = new StreamReader(stream);
+
+            // Read header
+            var headerLine = await reader.ReadLineAsync();
+            if (string.IsNullOrWhiteSpace(headerLine))
+            {
+                _errorMessage = "CSV file is empty";
+                return;
+            }
+
+            var headers = headerLine.Split(',').Select(h => h.Trim().Trim('"')).ToArray();
+            var punchInIndex = Array.FindIndex(headers, h => h.Equals("PunchIn", StringComparison.OrdinalIgnoreCase));
+            var punchOutIndex = Array.FindIndex(headers, h => h.Equals("PunchOut", StringComparison.OrdinalIgnoreCase));
+            var hourTypeIndex = Array.FindIndex(headers, h => h.Equals("HourType", StringComparison.OrdinalIgnoreCase));
+            var workDescIndex = Array.FindIndex(headers, h => h.Equals("WorkDescription", StringComparison.OrdinalIgnoreCase));
+
+            if (punchInIndex == -1)
+            {
+                _errorMessage = "CSV must contain a 'PunchIn' column";
+                return;
+            }
+
+            // Read data lines
+            string? line;
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var values = ParseCsvLine(line);
+
+                _previewRecords.Add(new CsvPreviewRecord
+                {
+                    PunchIn = GetValueAt(values, punchInIndex),
+                    PunchOut = GetValueAt(values, punchOutIndex),
+                    HourType = GetValueAt(values, hourTypeIndex),
+                    WorkDescription = GetValueAt(values, workDescIndex)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error previewing CSV: {ex.Message}";
+            _previewRecords = null;
+        }
+    }
+
+    private string?[] ParseCsvLine(string line)
+    {
+        var values = new List<string?>();
+        var inQuotes = false;
+        var currentValue = string.Empty;
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            var c = line[i];
+
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (c == ',' && !inQuotes)
+            {
+                values.Add(currentValue.Trim());
+                currentValue = string.Empty;
+            }
+            else
+            {
+                currentValue += c;
+            }
+        }
+
+        values.Add(currentValue.Trim());
+        return values.ToArray();
+    }
+
+    private string? GetValueAt(string?[] values, int index)
+    {
+        if (index < 0 || index >= values.Length)
+            return null;
+
+        var value = values[index];
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private class CsvImportResult
+    {
+        public int SuccessCount { get; set; }
+        public int FailureCount { get; set; }
+        public List<string> Errors { get; set; } = new();
+        public bool IsSuccess => FailureCount == 0 && SuccessCount > 0;
+    }
+
+    private class CsvPreviewRecord
+    {
+        public string? PunchIn { get; set; }
+        public string? PunchOut { get; set; }
+        public string? HourType { get; set; }
+        public string? WorkDescription { get; set; }
+    }
+}

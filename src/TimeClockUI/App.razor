@@ -8,11 +8,11 @@
     var authEnabled = Configuration.GetValue<bool>("Authentication:Enabled", true);
 }
 
-@if (authEnabled)
-{
-    <CascadingAuthenticationState>
-        <Router AppAssembly="@typeof(App).Assembly">
-            <Found Context="routeData">
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            @if (authEnabled)
+            {
                 <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
                     <NotAuthorized>
                         @if (!context.User.Identity.IsAuthenticated)
@@ -25,20 +25,11 @@
                         }
                     </NotAuthorized>
                 </AuthorizeRouteView>
-            </Found>
-            <NotFound>
-                <LayoutView Layout="@typeof(MainLayout)">
-                    <p>Sorry, there's nothing at this address.</p>
-                </LayoutView>
-            </NotFound>
-        </Router>
-    </CascadingAuthenticationState>
-}
-else
-{
-    <Router AppAssembly="@typeof(App).Assembly">
-        <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            }
+            else
+            {
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            }
         </Found>
         <NotFound>
             <LayoutView Layout="@typeof(MainLayout)">
@@ -46,5 +37,5 @@ else
             </LayoutView>
         </NotFound>
     </Router>
-}
+</CascadingAuthenticationState>
 

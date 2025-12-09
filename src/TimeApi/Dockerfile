@@ -5,10 +5,10 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY ["src/TimeApi/TimeApi.csproj", "TimeApi/"]
-COPY ["src/TimeClock.client/TimeClock.client.csproj", "TimeClock.client/"]
+COPY ["TimeApi/TimeApi.csproj", "TimeApi/"]
+COPY ["TimeClock.client/TimeClock.client.csproj", "TimeClock.client/"]
 RUN dotnet restore "TimeApi/TimeApi.csproj"
-COPY src/ .
+COPY . .
 WORKDIR "/src/TimeApi"
 RUN dotnet build "TimeApi.csproj" -c Release -o /app/build
 
