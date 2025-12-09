@@ -78,7 +78,51 @@ namespace TimeApi.Api
 
             return Ok(lastPunch);
         }
+
+        [HttpPut]
+        [Authorize]
+        public ActionResult UpdatePunch(PunchUpdateDto updateDto)
+        {
+            try
+            {
+                var authId = GetAuthId();
+                var updatedPunch = punchRepository.UpdatePunch(updateDto, authId);
+                return Ok(updatedPunch);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{punchId}")]
+        [Authorize]
+        public ActionResult DeletePunch(Guid punchId)
+        {
+            try
+            {
+                var authId = GetAuthId();
+                punchRepository.DeletePunch(punchId, authId);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+        }
     }
 
- 
+
 }

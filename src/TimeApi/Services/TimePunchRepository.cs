@@ -94,4 +94,67 @@ public class TimePunchRepository(TimeClockDbContext context) : ITimePunchReposit
 
         return validPunches.Count;
     }
+
+    public PunchRecord UpdatePunch(PunchUpdateDto updateDto, string authId)
+    {
+        // Validate punch out is after punch in
+        if (updateDto.PunchOut <= updateDto.PunchIn)
+        {
+            throw new ArgumentException("Punch out time must be after punch in time");
+        }
+
+        // Find the punch record
+        var punch = context.Punchs.FirstOrDefault(p => p.PunchId == updateDto.PunchId);
+
+        if (punch == null)
+        {
+            throw new InvalidOperationException("Punch record not found");
+        }
+
+        // Verify the punch belongs to the authenticated user
+        if (punch.AuthId != authId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to update this punch record");
+        }
+
+        // Update the punch times and hour type
+        punch.PunchIn = updateDto.PunchIn;
+        punch.PunchOut = updateDto.PunchOut;
+        punch.HourType = updateDto.HourType;
+        punch.UpdatedAt = DateTime.Now;
+
+        context.SaveChanges();
+
+        // Return the updated record
+        return new PunchRecord
+        {
+            PunchId = punch.PunchId,
+            PunchIn = punch.PunchIn,
+            PunchOut = punch.PunchOut,
+            HourType = punch.HourType,
+            AuthId = punch.AuthId,
+            WorkDescription = punch.WorkDescription
+        };
+    }
+
+    public void DeletePunch(Guid punchId, string authId)
+    {
+        // Find the punch record
+        var punch = context.Punchs.FirstOrDefault(p => p.PunchId == punchId);
+
+        if (punch == null)
+        {
+            throw new InvalidOperationException("Punch record not found");
+        }
+
+        // Verify the punch belongs to the authenticated user
+        if (punch.AuthId != authId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to delete this punch record");
+        }
+
+        // Remove the punch record
+        context.Punchs.Remove(punch);
+        context.SaveChanges();
+    }
 }

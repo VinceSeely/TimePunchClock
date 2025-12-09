@@ -1,3 +1,197 @@
 ﻿@page "/week-summary"
-@{
-}
+@using TimeClock.Client
+
+<AuthorizeView>
+    <Authorized>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+            <MudPaper Class="pa-4 mb-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h4">Week of @_weekStart.ToString("MMM d") - @_weekEnd.ToString("MMM d, yyyy")</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                                       OnClick="NavigateToPreviousWeek"
+                                       Color="Color.Primary" />
+                        <MudButton Variant="Variant.Outlined"
+                                   OnClick="NavigateToCurrentWeek"
+                                   StartIcon="@Icons.Material.Filled.Today">
+                            Today
+                        </MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                                       OnClick="NavigateToNextWeek"
+                                       Color="Color.Primary" />
+                    </MudStack>
+                </MudStack>
+
+                @if (UnsavedChangeCount > 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-3">
+                        You have @UnsavedChangeCount unsaved change(s).
+                        <MudButton Color="Color.Success"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Small"
+                                   OnClick="SaveAllChanges"
+                                   Class="ml-2">
+                            Save All Changes (@UnsavedChangeCount)
+                        </MudButton>
+                    </MudAlert>
+                }
+            </MudPaper>
+
+            @if (_isLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudTable Items="@_punchEditStates" Hover="true" Dense="true" Bordered="true">
+                    <HeaderContent>
+                        <MudTh>Day</MudTh>
+                        <MudTh>Punch In</MudTh>
+                        <MudTh>Punch Out</MudTh>
+                        <MudTh>Duration</MudTh>
+                        <MudTh>Hour Type</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate Context="punchState">
+                        <MudTd DataLabel="Day">
+                            @GetDayLabel(punchState.Current.PunchIn)
+                        </MudTd>
+                        <MudTd DataLabel="Punch In">
+                            @if (punchState.IsEditing)
+                            {
+                                <MudStack>
+                                    @if (punchState.IsDirty && punchState.Current.PunchIn != punchState.Original.PunchIn)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            Was: @punchState.Original.PunchIn.ToLocalTime().ToString("h:mm tt")
+                                        </MudText>
+                                    }
+                                    <MudTimePicker Time="@GetPunchInTimeSpan(punchState)"
+                                                   TimeChanged="@(v => SetPunchInTimeSpan(punchState, v))"
+                                                   Label="Punch In"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Class="@(punchState.IsDirty && punchState.Current.PunchIn != punchState.Original.PunchIn ? "mud-theme-warning" : "")" />
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudText>@punchState.Current.PunchIn.ToLocalTime().ToString("h:mm tt")</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Punch Out">
+                            @if (punchState.IsEditing)
+                            {
+                                <MudStack>
+                                    @if (punchState.IsDirty && punchState.Current.PunchOut != punchState.Original.PunchOut)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            Was: @punchState.Original.PunchOut?.ToLocalTime().ToString("h:mm tt")
+                                        </MudText>
+                                    }
+                                    <MudTimePicker Time="@GetPunchOutTimeSpan(punchState)"
+                                                   TimeChanged="@(v => SetPunchOutTimeSpan(punchState, v))"
+                                                   Label="Punch Out"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Error="@punchState.ValidationErrors.ContainsKey("PunchOut")"
+                                                   ErrorText="@punchState.ValidationErrors.GetValueOrDefault("PunchOut")"
+                                                   Class="@(punchState.IsDirty && punchState.Current.PunchOut != punchState.Original.PunchOut ? "mud-theme-warning" : "")" />
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudText>@punchState.Current.PunchOut?.ToLocalTime().ToString("h:mm tt")</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Duration">
+                            <MudText>@CalculateDuration(punchState.Current)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Hour Type">
+                            @if (punchState.IsEditing)
+                            {
+                                <MudStack>
+                                    @if (punchState.IsDirty && punchState.Current.HourType != punchState.Original.HourType)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            Was: @punchState.Original.HourType
+                                        </MudText>
+                                    }
+                                    <MudSelect T="HourType"
+                                               Value="@punchState.Current.HourType"
+                                               ValueChanged="@(v => SetHourType(punchState, v))"
+                                               Label="Hour Type"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Class="@(punchState.IsDirty && punchState.Current.HourType != punchState.Original.HourType ? "mud-theme-warning" : "")">
+                                        <MudSelectItem Value="@HourType.Regular">Regular</MudSelectItem>
+                                        <MudSelectItem Value="@HourType.TechLead">TechLead</MudSelectItem>
+                                    </MudSelect>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(punchState.Current.HourType == HourType.TechLead ? Color.Primary : Color.Default)">
+                                    @punchState.Current.HourType
+                                </MudChip>
+                            }
+                            @if (punchState.IsDirty && !punchState.IsEditing)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">Modified</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            @if (punchState.IsEditing)
+                            {
+                                <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Save"
+                                                   Size="Size.Small"
+                                                   Color="Color.Success"
+                                                   OnClick="@(() => SavePunch(punchState))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                                   Size="Size.Small"
+                                                   Color="Color.Default"
+                                                   OnClick="@(() => CancelEditing(punchState))" />
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudStack Row="true" Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => StartEditing(punchState))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => DeletePunch(punchState))" />
+                                </MudStack>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+                            No punch records found for this week.
+                        </MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            }
+        </MudContainer>
+    </Authorized>
+    <NotAuthorized>
+        <MudCard Class="ma-4">
+            <MudCardContent>
+                <MudText Typo="@Typo.h4" Class="mb-4">Authentication Required</MudText>
+                <MudText Typo="@Typo.body1" Class="mb-2">
+                    Please log in to view your week summary.
+                </MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="authentication/login">
+                    Log In
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </NotAuthorized>
+</AuthorizeView>

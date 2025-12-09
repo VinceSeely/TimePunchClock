@@ -513,4 +513,307 @@ public class TimePunchRepositoryTests
     }
 
     #endregion
+
+    #region UpdatePunch Tests
+
+    [Test]
+    public void UpdatePunch_UpdatesExistingPunch_Successfully()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var originalPunchIn = DateTime.Today.AddHours(9);
+        var originalPunchOut = DateTime.Today.AddHours(17);
+        var punch = TestDataFactory.CreateClosedPunch(originalPunchIn, HourType.Regular, authId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        var newPunchIn = DateTime.Today.AddHours(9).AddMinutes(15);
+        var newPunchOut = DateTime.Today.AddHours(17).AddMinutes(-15);
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = newPunchIn,
+            PunchOut = newPunchOut,
+            HourType = HourType.Regular
+        };
+
+        // Act
+        _repository.UpdatePunch(updateDto, authId);
+
+        // Assert
+        var updatedPunch = _context.Punchs.First();
+        updatedPunch.PunchIn.Should().Be(newPunchIn);
+        updatedPunch.PunchOut.Should().Be(newPunchOut);
+        updatedPunch.HourType.Should().Be(HourType.Regular);
+        updatedPunch.AuthId.Should().Be(authId); // Should not change
+    }
+
+    [Test]
+    public void UpdatePunch_ThrowsException_WhenPunchNotFound()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var nonExistentPunchId = Guid.NewGuid();
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = nonExistentPunchId,
+            PunchIn = DateTime.Today.AddHours(9),
+            PunchOut = DateTime.Today.AddHours(17),
+            HourType = HourType.Regular
+        };
+
+        // Act & Assert
+        var act = () => _repository.UpdatePunch(updateDto, authId);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Punch record not found");
+    }
+
+    [Test]
+    public void UpdatePunch_ThrowsException_WhenPunchBelongsToDifferentUser()
+    {
+        // Arrange
+        var ownerAuthId = "owner-user-123";
+        var otherAuthId = "other-user-456";
+        var punch = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, ownerAuthId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = DateTime.Today.AddHours(10),
+            PunchOut = DateTime.Today.AddHours(18),
+            HourType = HourType.Regular
+        };
+
+        // Act & Assert
+        var act = () => _repository.UpdatePunch(updateDto, otherAuthId);
+        act.Should().Throw<UnauthorizedAccessException>()
+            .WithMessage("You are not authorized to update this punch record");
+    }
+
+    [Test]
+    public void UpdatePunch_ThrowsException_WhenPunchOutBeforePunchIn()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var punch = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, authId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = DateTime.Today.AddHours(17),
+            PunchOut = DateTime.Today.AddHours(9), // Invalid: out before in
+            HourType = HourType.Regular
+        };
+
+        // Act & Assert
+        var act = () => _repository.UpdatePunch(updateDto, authId);
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Punch out time must be after punch in time");
+    }
+
+    [Test]
+    public void UpdatePunch_UpdatesTimestampFields_Correctly()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var punch = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, authId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+        var originalUpdatedAt = punch.UpdatedAt;
+
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = DateTime.Today.AddHours(9).AddMinutes(30),
+            PunchOut = DateTime.Today.AddHours(17).AddMinutes(30),
+            HourType = HourType.Regular
+        };
+
+        // Act
+        _repository.UpdatePunch(updateDto, authId);
+
+        // Assert
+        var updatedPunch = _context.Punchs.First();
+        updatedPunch.UpdatedAt.Should().BeAfter(originalUpdatedAt);
+        updatedPunch.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(2));
+        updatedPunch.CreatedAt.Should().Be(punch.CreatedAt); // Should not change
+    }
+
+    [Test]
+    public void UpdatePunch_AllowsMinorTimeAdjustments()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var originalPunchIn = DateTime.Today.AddHours(9);
+        var punch = TestDataFactory.CreateClosedPunch(originalPunchIn, HourType.Regular, authId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        // Adjust by 1 minute
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = originalPunchIn.AddMinutes(1),
+            PunchOut = originalPunchIn.AddHours(8).AddMinutes(1),
+            HourType = HourType.Regular
+        };
+
+        // Act
+        _repository.UpdatePunch(updateDto, authId);
+
+        // Assert
+        var updatedPunch = _context.Punchs.First();
+        updatedPunch.PunchIn.Should().Be(originalPunchIn.AddMinutes(1));
+        updatedPunch.PunchOut.Should().Be(originalPunchIn.AddHours(8).AddMinutes(1));
+    }
+
+    [Test]
+    public void UpdatePunch_PreservesWorkDescription()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var workDescription = "Important project work";
+        var punch = TestDataFactory.CreateClosedPunch(
+            DateTime.Today.AddHours(9),
+            HourType.Regular,
+            authId,
+            workDescription);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = DateTime.Today.AddHours(9).AddMinutes(15),
+            PunchOut = DateTime.Today.AddHours(17).AddMinutes(15),
+            HourType = HourType.Regular
+        };
+
+        // Act
+        _repository.UpdatePunch(updateDto, authId);
+
+        // Assert
+        var updatedPunch = _context.Punchs.First();
+        updatedPunch.WorkDescription.Should().Be(workDescription);
+    }
+
+    [Test]
+    public void UpdatePunch_ReturnsUpdatedPunchRecord()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var punch = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, authId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        var newPunchIn = DateTime.Today.AddHours(9).AddMinutes(30);
+        var newPunchOut = DateTime.Today.AddHours(17).AddMinutes(30);
+        var updateDto = new PunchUpdateDto
+        {
+            PunchId = punch.PunchId,
+            PunchIn = newPunchIn,
+            PunchOut = newPunchOut,
+            HourType = HourType.Regular
+        };
+
+        // Act
+        var result = _repository.UpdatePunch(updateDto, authId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.PunchId.Should().Be(punch.PunchId);
+        result.PunchIn.Should().Be(newPunchIn);
+        result.PunchOut.Should().Be(newPunchOut);
+        result.HourType.Should().Be(HourType.Regular);
+    }
+
+    #endregion
+
+    #region DeletePunch Tests
+
+    [Test]
+    public void DeletePunch_RemovesPunchFromDatabase()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var punch = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, authId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        // Act
+        _repository.DeletePunch(punch.PunchId, authId);
+
+        // Assert
+        _context.Punchs.Should().BeEmpty();
+    }
+
+    [Test]
+    public void DeletePunch_ThrowsException_WhenPunchNotFound()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var nonExistentPunchId = Guid.NewGuid();
+
+        // Act & Assert
+        var act = () => _repository.DeletePunch(nonExistentPunchId, authId);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Punch record not found");
+    }
+
+    [Test]
+    public void DeletePunch_ThrowsException_WhenUserUnauthorized()
+    {
+        // Arrange
+        var ownerAuthId = "owner-user";
+        var unauthorizedAuthId = "unauthorized-user";
+        var punch = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, ownerAuthId);
+        _context.Punchs.Add(punch);
+        _context.SaveChanges();
+
+        // Act & Assert
+        var act = () => _repository.DeletePunch(punch.PunchId, unauthorizedAuthId);
+        act.Should().Throw<UnauthorizedAccessException>()
+            .WithMessage("You are not authorized to delete this punch record");
+    }
+
+    [Test]
+    public void DeletePunch_OnlyDeletesSpecificPunch_LeavesOthersIntact()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var punch1 = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(9), HourType.Regular, authId);
+        var punch2 = TestDataFactory.CreateClosedPunch(DateTime.Today.AddHours(13), HourType.Regular, authId);
+        _context.Punchs.AddRange(punch1, punch2);
+        _context.SaveChanges();
+
+        // Act
+        _repository.DeletePunch(punch1.PunchId, authId);
+
+        // Assert
+        _context.Punchs.Should().HaveCount(1);
+        _context.Punchs.First().PunchId.Should().Be(punch2.PunchId);
+    }
+
+    [Test]
+    public void DeletePunch_CanDeleteOpenPunch()
+    {
+        // Arrange
+        var authId = "test-user-123";
+        var openPunch = TestDataFactory.CreateOpenPunch(HourType.Regular);
+        openPunch.AuthId = authId;
+        _context.Punchs.Add(openPunch);
+        _context.SaveChanges();
+
+        // Act
+        _repository.DeletePunch(openPunch.PunchId, authId);
+
+        // Assert
+        _context.Punchs.Should().BeEmpty();
+    }
+
+    #endregion
 }

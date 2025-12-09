@@ -83,4 +83,47 @@ public class TimePunchClient(IHttpClientFactory clientFactory)
 
     }
 
+    public async Task<PunchRecord?> UpdatePunch(PunchUpdateDto updateDto, CancellationToken cancellationToken = default)
+    {
+        var client = clientFactory.CreateClient(Constants.TimeClientString);
+        try
+        {
+            var json = JsonConvert.SerializeObject(updateDto);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await client.PutAsync(Constants.TimePunchApi, content, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var resultJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            var updatedPunch = JsonConvert.DeserializeObject<PunchRecord>(resultJson);
+            return updatedPunch;
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return null;
+    }
+
+    public async Task<bool> DeletePunch(Guid punchId, CancellationToken cancellationToken = default)
+    {
+        var client = clientFactory.CreateClient(Constants.TimeClientString);
+        try
+        {
+            var response = await client.DeleteAsync($"{Constants.TimePunchApi}/{punchId}", cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return false;
+    }
+
 }
