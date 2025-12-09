@@ -19,6 +19,12 @@
                 <MudSelectItem Value="@hourType">@GetPunchTypeDisplayString(hourType)</MudSelectItem>
             }
         </MudSelect>
+        
+        <MudTextField 
+            @bind-Value="@_workDescription" 
+            Label="Hours Description" 
+            AutoGrow="true" 
+            Lines="1" />
 
         <MudSwitch @bind-value="@_showHours"></MudSwitch >
 
