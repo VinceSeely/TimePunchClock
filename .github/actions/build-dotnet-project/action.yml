@@ -1,0 +1,73 @@
+name: 'Build .NET Project'
+description: 'Restore, build, and optionally test a .NET project'
+
+inputs:
+  project-path:
+    description: 'Path to .csproj file'
+    required: true
+  dotnet-version:
+    description: '.NET SDK version'
+    required: false
+    default: '8.0.x'
+  configuration:
+    description: 'Build configuration'
+    required: false
+    default: 'Release'
+  run-tests:
+    description: 'Run tests after build'
+    required: false
+    default: 'false'
+  test-path:
+    description: 'Path to test project (if run-tests is true)'
+    required: false
+  test-logger:
+    description: 'Test logger configuration'
+    required: false
+    default: 'trx;LogFileName=test-results.trx'
+  test-verbosity:
+    description: 'Test output verbosity'
+    required: false
+    default: 'normal'
+  collect-coverage:
+    description: 'Collect code coverage'
+    required: false
+    default: 'false'
+
+outputs:
+  test-results-path:
+    description: 'Path to test results file'
+    value: ${{ steps.test.outputs.results-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Restore dependencies
+      shell: bash
+      run: dotnet restore ${{ inputs.project-path }}
+
+    - name: Build
+      shell: bash
+      run: dotnet build ${{ inputs.project-path }} --configuration ${{ inputs.configuration }} --no-restore
+
+    - name: Run Tests
+      id: test
+      if: ${{ inputs.run-tests == 'true' && inputs.test-path != '' }}
+      shell: bash
+      run: |
+        COVERAGE_FLAG=""
+        if [ "${{ inputs.collect-coverage }}" == "true" ]; then
+          COVERAGE_FLAG="--collect:\"XPlat Code Coverage\""
+        fi
+
+        dotnet test ${{ inputs.test-path }} \
+          --configuration ${{ inputs.configuration }} \
+          --verbosity ${{ inputs.test-verbosity }} \
+          --logger "${{ inputs.test-logger }}" \
+          $COVERAGE_FLAG
+
+        echo "results-path=**/test-results.trx" >> $GITHUB_OUTPUT

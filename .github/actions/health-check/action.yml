@@ -1,0 +1,84 @@
+name: 'Health Check'
+description: 'Perform HTTP health check with retries'
+
+inputs:
+  url:
+    description: 'URL to check'
+    required: true
+  health-endpoint:
+    description: 'Health endpoint path'
+    required: false
+    default: '/health'
+  max-retries:
+    description: 'Maximum retry attempts'
+    required: false
+    default: '10'
+  retry-delay:
+    description: 'Delay between retries (seconds)'
+    required: false
+    default: '10'
+  initial-delay:
+    description: 'Initial delay before first check (seconds)'
+    required: false
+    default: '15'
+  expected-status-codes:
+    description: 'Comma-separated expected HTTP status codes'
+    required: false
+    default: '200,301,302'
+  fail-on-error:
+    description: 'Fail if health check does not pass'
+    required: false
+    default: 'false'
+
+outputs:
+  success:
+    description: 'Health check success status'
+    value: ${{ steps.check.outputs.success }}
+  http-code:
+    description: 'Final HTTP response code'
+    value: ${{ steps.check.outputs.http-code }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Health Check
+      id: check
+      shell: bash
+      run: |
+        URL="${{ inputs.url }}"
+        HEALTH_ENDPOINT="${{ inputs.health-endpoint }}"
+        MAX_RETRIES=${{ inputs.max-retries }}
+        RETRY_DELAY=${{ inputs.retry-delay }}
+        INITIAL_DELAY=${{ inputs.initial-delay }}
+        EXPECTED_CODES="${{ inputs.expected-status-codes }}"
+        FAIL_ON_ERROR="${{ inputs.fail-on-error }}"
+
+        echo "Running health check on $URL$HEALTH_ENDPOINT"
+        echo "Waiting ${INITIAL_DELAY}s before first check..."
+        sleep $INITIAL_DELAY
+
+        SUCCESS=false
+        HTTP_CODE=""
+
+        for i in $(seq 1 $MAX_RETRIES); do
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL$HEALTH_ENDPOINT" || curl -s -o /dev/null -w "%{http_code}" "$URL")
+
+          if echo "$EXPECTED_CODES" | grep -q "$HTTP_CODE"; then
+            echo "✅ Health check passed (HTTP $HTTP_CODE)"
+            SUCCESS=true
+            break
+          fi
+
+          echo "Attempt $i failed (HTTP $HTTP_CODE), retrying in ${RETRY_DELAY}s..."
+          sleep $RETRY_DELAY
+        done
+
+        echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+        echo "http-code=$HTTP_CODE" >> $GITHUB_OUTPUT
+
+        if [ "$SUCCESS" = false ]; then
+          echo "⚠️ Health check did not pass after $MAX_RETRIES attempts"
+          if [ "$FAIL_ON_ERROR" = true ]; then
+            exit 1
+          fi
+        fi
