@@ -9,9 +9,13 @@ namespace TimeApi.IntegrationTests;
 /// <summary>
 /// Custom WebApplicationFactory for integration testing.
 /// Replaces SQL Server with in-memory database for fast, isolated tests.
+/// Each instance uses a unique database name to ensure test isolation.
+/// The in-memory database is automatically cleaned up when the factory is disposed.
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string _databaseName = $"TestDb_{Guid.NewGuid()}";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureServices(services =>
@@ -27,11 +31,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 services.Remove(descriptor);
             }
 
-            // Add in-memory database for testing with a dedicated service provider
-            services.AddDbContext<TimeClockDbContext>((serviceProvider, options) =>
+            // Add in-memory database for testing with unique name for isolation
+            services.AddDbContext<TimeClockDbContext>(options =>
             {
-                options.UseInMemoryDatabase("TestDb")
-                       .UseInternalServiceProvider(null); // Force EF to create its own service provider
+                options.UseInMemoryDatabase(_databaseName);
             });
 
             // Build the service provider
