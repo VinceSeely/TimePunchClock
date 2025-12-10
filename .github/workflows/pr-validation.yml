@@ -5,7 +5,7 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/**'
-      - 'docker-compose.yml'
+      - 'docker compose .yml'
       - 'Dockerfile*'
 
 env:
@@ -208,7 +208,7 @@ jobs:
           echo "Frontend is ready for deployment! 🎨" >> $GITHUB_STEP_SUMMARY
 
   docker-compose-validation:
-    name: Validate docker-compose
+    name: Validate docker compose 
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -217,24 +217,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate docker-compose.yml
+      - name: Validate docker compose .yml
         run: |
-          echo "Validating docker-compose configuration..."
-          docker-compose -f docker-compose.yml config > /dev/null
+          echo "Validating docker compose configuration..."
+          docker compose -f docker-compose.yml config > /dev/null
           echo "✅ docker-compose.yml is valid"
 
       - name: Build services (validation only)
         run: |
-          echo "Building services with docker-compose (no database for PR)..."
+          echo "Building services with docker compose  (no database for PR)..."
 
           # Build only the app services, not the database
-          docker-compose build timeapi timeclockui
+          docker compose build timeapi timeclockui
 
-          echo "✅ All services built successfully with docker-compose"
+          echo "✅ All services built successfully with docker compose "
 
-      - name: docker-compose Summary
+      - name: docker compose  Summary
         run: |
-          echo "## docker-compose Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## docker compose Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Configuration is valid" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Services build successfully" >> $GITHUB_STEP_SUMMARY
