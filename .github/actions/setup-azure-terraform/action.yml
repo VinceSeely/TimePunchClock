@@ -1,0 +1,55 @@
+name: 'Setup Azure & Terraform'
+description: 'Authenticates with Azure and initializes Terraform'
+
+inputs:
+  azure-client-id:
+    description: 'Azure Client ID'
+    required: true
+  azure-tenant-id:
+    description: 'Azure Tenant ID'
+    required: true
+  azure-subscription-id:
+    description: 'Azure Subscription ID'
+    required: true
+  terraform-version:
+    description: 'Terraform version to use'
+    required: false
+    default: '1.6.0'
+  terraform-working-directory:
+    description: 'Working directory for Terraform'
+    required: true
+  terraform-wrapper:
+    description: 'Enable terraform wrapper (set false for Infracost)'
+    required: false
+    default: 'true'
+  run-init:
+    description: 'Run terraform init'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: ${{ inputs.terraform-wrapper }}
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    - name: Terraform Init
+      if: ${{ inputs.run-init == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.terraform-working-directory }}
+      env:
+        ARM_CLIENT_ID: ${{ inputs.azure-client-id }}
+        ARM_TENANT_ID: ${{ inputs.azure-tenant-id }}
+        ARM_SUBSCRIPTION_ID: ${{ inputs.azure-subscription-id }}
+        ARM_USE_OIDC: true
+      run: terraform init
