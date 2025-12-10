@@ -55,7 +55,7 @@ jobs:
             docker tag timeapi:${{ github.sha }} $IMAGE_NAME:latest
           else
             echo "Building image from source..."
-            docker build -t $IMAGE_NAME:$IMAGE_TAG -f src/TimeApi/Dockerfile .
+            docker build -t $IMAGE_NAME:$IMAGE_TAG -f src/TimeApi/Dockerfile ./src
             docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
           fi
 

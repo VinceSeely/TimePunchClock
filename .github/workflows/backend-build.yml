@@ -74,7 +74,7 @@ jobs:
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_NAME="$REGISTRY/$REPO_LOWER/backend-api"
 
-          docker build -t $IMAGE_NAME:${{ github.sha }} -f src/TimeApi/Dockerfile .
+          docker build -t $IMAGE_NAME:${{ github.sha }} -f src/TimeApi/Dockerfile ./src
           docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
           docker tag $IMAGE_NAME:${{ github.sha }} timeapi:${{ github.sha }}
 

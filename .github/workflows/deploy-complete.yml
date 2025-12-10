@@ -144,7 +144,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t timeapi:${{ github.sha }} -f src/TimeApi/Dockerfile .
+          docker build -t timeapi:${{ github.sha }} -f src/TimeApi/Dockerfile ./src
           docker tag timeapi:${{ github.sha }} timeapi:latest
 
       - name: Save Docker image

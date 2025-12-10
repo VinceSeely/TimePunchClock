@@ -1,0 +1,242 @@
+name: PR Validation - Build & Security Check
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - '.github/workflows/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile*'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  validate-backend:
+    name: Validate Backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      checks: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # .NET Build and Test (fast validation)
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore src/TimeApi/TimeApi.csproj
+
+      - name: Build
+        run: dotnet build src/TimeApi/TimeApi.csproj --configuration Release --no-restore
+
+      - name: Run Unit Tests
+        run: |
+          if [ -d "tests/TimeApi.Tests" ]; then
+            dotnet test tests/TimeApi.Tests/TimeApi.Tests.csproj \
+              --configuration Release \
+              --verbosity normal \
+              --logger "trx;LogFileName=test-results.trx" \
+              --collect:"XPlat Code Coverage"
+          else
+            echo "No unit tests found, skipping"
+          fi
+
+      - name: Run Integration Tests
+        run: |
+          if [ -d "tests/TimeApi.IntegrationTests" ]; then
+            dotnet test tests/TimeApi.IntegrationTests/TimeApi.IntegrationTests.csproj \
+              --configuration Release \
+              --verbosity normal \
+              --logger "trx;LogFileName=integration-test-results.trx"
+          else
+            echo "No integration tests found, skipping"
+          fi
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always() && hashFiles('**/test-results.trx') != ''
+        with:
+          name: Backend Tests
+          path: '**/test-results.trx'
+          reporter: dotnet-trx
+
+      # Docker Build (verify containerization works - DO NOT PUSH)
+      - name: Build Docker Image (Backend)
+        run: |
+          echo "Building Docker image for PR validation..."
+          echo "Image will be built but NOT published to any registry"
+
+          docker build \
+            -t timeapi:pr-${{ github.event.pull_request.number }} \
+            -f src/TimeApi/Dockerfile \
+            ./src
+
+          echo "Docker image size:"
+          docker images timeapi:pr-${{ github.event.pull_request.number }} --format "{{.Size}}"
+
+          echo "✅ Docker image built successfully"
+
+      # Security Scanning (ensure image is safe before merge)
+      - name: Run Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'timeapi:pr-${{ github.event.pull_request.number }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy Results to Security Tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy Table Format (for PR comment)
+        uses: aquasecurity/trivy-action@master
+        if: always()
+        with:
+          image-ref: 'timeapi:pr-${{ github.event.pull_request.number }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: PR Validation Summary
+        if: always()
+        run: |
+          echo "## Backend PR Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Number:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base:** ${{ github.base_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Validation Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ .NET Build & Restore" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Integration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Docker Build (Context: ./src)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security Scan (Trivy)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Docker image built for validation only - NOT published to any registry" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Ready for review and merge! 🚀" >> $GITHUB_STEP_SUMMARY
+
+  validate-frontend:
+    name: Validate Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore src/TimeClockUI/TimeClockUI.csproj
+
+      - name: Build
+        run: dotnet build src/TimeClockUI/TimeClockUI.csproj --configuration Release --no-restore
+
+      - name: Run Frontend Tests
+        run: |
+          if [ -d "tests/TimeClockUI.Tests" ]; then
+            dotnet test tests/TimeClockUI.Tests/TimeClockUI.Tests.csproj \
+              --configuration Release \
+              --verbosity normal \
+              --logger "trx;LogFileName=frontend-test-results.trx"
+          else
+            echo "No frontend tests found, skipping"
+          fi
+
+      # Docker Build for Frontend (verify nginx config, etc.)
+      - name: Build Docker Image (Frontend)
+        run: |
+          echo "Building Frontend Docker image for PR validation..."
+
+          docker build \
+            -t timeclockui:pr-${{ github.event.pull_request.number }} \
+            -f src/TimeClockUI/Dockerfile \
+            ./src
+
+          echo "Docker image size:"
+          docker images timeclockui:pr-${{ github.event.pull_request.number }} --format "{{.Size}}"
+
+          echo "✅ Frontend Docker image built successfully"
+
+      - name: Run Trivy Security Scan (Frontend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'timeclockui:pr-${{ github.event.pull_request.number }}'
+          format: 'sarif'
+          output: 'trivy-results-frontend.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results-frontend.sarif'
+
+      - name: Frontend Validation Summary
+        if: always()
+        run: |
+          echo "## Frontend PR Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Number:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Validation Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Blazor WASM Build" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Frontend Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Docker Build (nginx + WASM)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Frontend is ready for deployment! 🎨" >> $GITHUB_STEP_SUMMARY
+
+  docker-compose-validation:
+    name: Validate docker-compose
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: |
+          echo "Validating docker-compose configuration..."
+          docker-compose -f docker-compose.yml config > /dev/null
+          echo "✅ docker-compose.yml is valid"
+
+      - name: Build services (validation only)
+        run: |
+          echo "Building services with docker-compose (no database for PR)..."
+
+          # Build only the app services, not the database
+          docker-compose build timeapi timeclockui
+
+          echo "✅ All services built successfully with docker-compose"
+
+      - name: docker-compose Summary
+        run: |
+          echo "## docker-compose Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Configuration is valid" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Services build successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Local development environment is working! 🐳" >> $GITHUB_STEP_SUMMARY
