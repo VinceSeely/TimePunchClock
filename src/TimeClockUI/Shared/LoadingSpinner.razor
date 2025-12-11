@@ -1,0 +1,9 @@
+@using TimeClockUI.Services
+
+@if (LoadingService.IsLoading)
+{
+    <div class="loading-indicator" role="status" aria-live="polite" aria-atomic="true">
+        <span class="sr-only">Page is processing your request</span>
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" Class="loading-spinner" />
+    </div>
+}

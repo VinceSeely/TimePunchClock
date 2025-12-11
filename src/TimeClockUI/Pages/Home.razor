@@ -2,6 +2,7 @@
 @using MudBlazor
 @using TimeClock.Client
 @using Microsoft.AspNetCore.Authorization
+@using TimeClockUI.Services
 
 
 <PageTitle>Punch Clock</PageTitle>
@@ -10,8 +11,24 @@
     <Authorized>
         <h1>@DisplayNextPunchStatus</h1>
 
-        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmAdd" OnClick="PunchIn">Punch In</MudButton>
-        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AlarmOff" OnClick="PunchOut" Disabled="@_ShouldPunchIn">Punch Out</MudButton>
+        <MudButton
+            Variant="Variant.Filled"
+            StartIcon="@Icons.Material.Filled.AlarmAdd"
+            OnClick="PunchIn"
+            Disabled="@LoadingService.IsLoading"
+            aria-busy="@LoadingService.IsLoading"
+            aria-label="@(LoadingService.IsLoading ? "Punching in, please wait" : "Punch in")">
+            @(LoadingService.IsLoading ? "Punching In..." : "Punch In")
+        </MudButton>
+        <MudButton
+            Variant="Variant.Filled"
+            StartIcon="@Icons.Material.Filled.AlarmOff"
+            OnClick="PunchOut"
+            Disabled="@(_ShouldPunchIn || LoadingService.IsLoading)"
+            aria-busy="@LoadingService.IsLoading"
+            aria-label="@(LoadingService.IsLoading ? "Punching out, please wait" : _ShouldPunchIn ? "Cannot punch out, must punch in first" : "Punch out")">
+            @(LoadingService.IsLoading ? "Punching Out..." : "Punch Out")
+        </MudButton>
         <MudText Typo="@Typo.h4">Hours Type:</MudText>
         <MudSelect Label="Show Hours" @bind-Value="@_punchType">
             @foreach (HourType hourType in Enum.GetValues(typeof(HourType)))

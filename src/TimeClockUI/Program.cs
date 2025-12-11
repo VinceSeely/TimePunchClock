@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 using TimeClock.Client;
 using TimeClockUI;
+using TimeClockUI.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -68,6 +69,7 @@ else
 
 builder.Services.RegsiterTimeClient(builder.Configuration);
 builder.Services.AddMudServices();
+builder.Services.AddScoped<LoadingService>();
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 

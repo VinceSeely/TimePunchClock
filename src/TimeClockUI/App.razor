@@ -7,7 +7,7 @@
 @{
     var authEnabled = Configuration.GetValue<bool>("Authentication:Enabled", true);
 }
-
+<LoadingSpinner/>
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">

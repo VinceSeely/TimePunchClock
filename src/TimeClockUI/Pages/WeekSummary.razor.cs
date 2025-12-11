@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using TimeClock.Client;
+using TimeClockUI.Services;
 
 namespace TimeClockUI.Pages;
 
@@ -10,12 +11,12 @@ public partial class WeekSummary
     [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
     [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] public ISnackbar Snackbar { get; set; } = null!;
+    [Inject] public LoadingService LoadingService { get; set; } = null!;
 
     private List<PunchEditState> _punchEditStates = new();
     private DateTime _weekStart;
     private DateTime _weekEnd;
     private bool _isAuthenticated = false;
-    private bool _isLoading = false;
 
     private int UnsavedChangeCount => _punchEditStates.Count(x => x.IsDirty);
 
@@ -41,8 +42,7 @@ public partial class WeekSummary
 
     private async Task LoadWeekData()
     {
-        _isLoading = true;
-        try
+        using (LoadingService.Track())
         {
             var punches = await TimePunchClient.GetPunchesRange(_weekStart, _weekEnd.AddDays(1)) ?? Enumerable.Empty<PunchRecord>();
             _punchEditStates = punches.Select(p => new PunchEditState
@@ -59,10 +59,6 @@ public partial class WeekSummary
                 },
                 IsEditing = false
             }).ToList();
-        }
-        finally
-        {
-            _isLoading = false;
         }
     }
 

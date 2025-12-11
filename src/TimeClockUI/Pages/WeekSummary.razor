@@ -1,5 +1,6 @@
 ﻿@page "/week-summary"
 @using TimeClock.Client
+@using TimeClockUI.Services
 
 <AuthorizeView>
     <Authorized>
@@ -37,11 +38,7 @@
                 }
             </MudPaper>
 
-            @if (_isLoading)
-            {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else
+            @if (!LoadingService.IsLoading)
             {
                 <MudTable Items="@_punchEditStates" Hover="true" Dense="true" Bordered="true">
                     <HeaderContent>

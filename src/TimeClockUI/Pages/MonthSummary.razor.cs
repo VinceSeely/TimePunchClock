@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using TimeClock.Client;
 using TimeClockUI.Models;
+using TimeClockUI.Services;
 
 namespace TimeClockUI.Pages;
 
@@ -9,6 +10,7 @@ public partial class MonthSummary
 {
     [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
     [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] public LoadingService LoadingService { get; set; } = null!;
 
     private List<MonthOption> _months = new()
     {
@@ -65,8 +67,11 @@ public partial class MonthSummary
 
     private async Task CalculateHours()
     {
-        _todaysPunchs = await TimePunchClient.GetPunchesRange(_startDate, _endDate) ?? Enumerable.Empty<PunchRecord>();
-        CalculateAndSetHours();
+        using (LoadingService.Track())
+        {
+            _todaysPunchs = await TimePunchClient.GetPunchesRange(_startDate, _endDate) ?? Enumerable.Empty<PunchRecord>();
+            CalculateAndSetHours();
+        }
     }
 
     private void CalculateAndSetHours()

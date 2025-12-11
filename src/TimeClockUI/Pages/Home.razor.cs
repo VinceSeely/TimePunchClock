@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using TimeClock.Client;
+using TimeClockUI.Services;
 
 namespace TimeClockUI.Pages;
 
@@ -8,6 +9,7 @@ public partial class Home
 {
     [Inject] public TimePunchClient TimePunchClient { get; set; } = null!;
     [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] public LoadingService LoadingService { get; set; } = null!;
 
     private string DisplayNextPunchStatus =>
         $"Please Punch {(_ShouldPunchIn ? "in" : "out")} last Punch time: {GetLastPunchTimeString()}";
@@ -34,10 +36,13 @@ public partial class Home
 
         if (_isAuthenticated)
         {
-            // User is logged in, safe to make API calls
-            _lastPunch = await TimePunchClient.GetLastPunch();
-            _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
-            CalculateAndSetHours();
+            using (LoadingService.Track())
+            {
+                // User is logged in, safe to make API calls
+                _lastPunch = await TimePunchClient.GetLastPunch();
+                _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
+                CalculateAndSetHours();
+            }
         }
         else
         {
@@ -63,18 +68,26 @@ public partial class Home
 
     private async Task PunchIn()
     {
-        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchIn, _workDescription);
-        _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
-        CalculateAndSetHours();
-        StateHasChanged();
+        using (LoadingService.Track())
+        {
+            _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchIn, _workDescription);
+            _workDescription = string.Empty;
+            _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
+            CalculateAndSetHours();
+            StateHasChanged();
+        }
     }
 
     private async Task PunchOut()
     {
-        _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchOut, _workDescription);
-        _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
-        CalculateAndSetHours();
-        StateHasChanged();
+        using (LoadingService.Track())
+        {
+            _lastPunch = await TimePunchClient.Punch(_punchType, PunchType.PunchOut, _workDescription);
+            _workDescription = string.Empty;
+            _todaysPunchs = await TimePunchClient.GetTodaysPunchs();
+            CalculateAndSetHours();
+            StateHasChanged();
+        }
     }
 
     private void CalculateAndSetHours()
