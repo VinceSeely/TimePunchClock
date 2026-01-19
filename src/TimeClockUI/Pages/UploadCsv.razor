@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using System.Text.Json
 @using Microsoft.JSInterop
+@using TimeClock.Client
 @inject HttpClient Http
 @inject IAccessTokenProvider TokenProvider
 @inject IConfiguration Configuration
@@ -242,7 +243,7 @@
             }
 
             // Create HTTP request
-            var apiBaseUrl = Configuration["ApiBaseUrl"] ?? "https://localhost:7285";
+            var apiBaseUrl = Configuration[Constants.TimeClientBaseUrl];
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{apiBaseUrl}/api/csvupload/upload");
 
             if (!string.IsNullOrEmpty(accessToken))
